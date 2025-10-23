@@ -7,7 +7,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -68,7 +69,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Widget _buildFriendChatList() {
     final chats = [
       {
-        'name': '김철수',
+        'name': '김진규',
         'message': '내일 회의 시간이 바뀌었어',
         'time': '방금',
         'avatar': '👨',
