@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -157,7 +158,18 @@ class _HomeScreenState extends State<HomeScreen>
           color: Colors.grey,
         ),
       ),
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfileScreen(
+              userName: name,
+              userImage: 'https://i.pravatar.cc/150?u=$name',
+              status: status,
+            ),
+          ),
+        );
+      },
     );
   }
 
