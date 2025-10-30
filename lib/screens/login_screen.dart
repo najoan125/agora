@@ -1,5 +1,6 @@
 import 'package:agora/screens/register_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -64,36 +65,23 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Center(
+          child: Container(
+            height: MediaQuery.of(context).size.height - 50, // SafeArea 높이 고려
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
-                Container(
-                  width: 100,
+                // Logo (SVG)
+                SvgPicture.asset(
+                  'assets/images/logo.svg',
+                  width: 300,
                   height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Agora',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ),
-                const SizedBox(height: 40),
 
                 // Title
                 const Text(
                   'Agora에 접속하세요',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
