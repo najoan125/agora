@@ -1,3 +1,4 @@
+import 'package:agora/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'main_screen.dart';
 
@@ -48,6 +49,12 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const MainScreen()),
       );
     });
+  }
+
+  void _register() {
+    Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const SignUpPage()),
+      );
   }
 
   @override
@@ -229,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.grey),
                     ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: _register,
                       child: const Text(
                         '회원가입',
                         style: TextStyle(
