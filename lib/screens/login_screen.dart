@@ -54,8 +54,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _register() {
     Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const SignUpPage()),
-      );
+      MaterialPageRoute(builder: (context) => const SignUpPage()),
+    );
   }
 
   @override
@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Logo (SVG)
                 SvgPicture.asset(
-                  'assets/images/logo.svg',
+                  'assets/images/logo.original.svg',
                   width: 300,
                   height: 100,
                 ),
