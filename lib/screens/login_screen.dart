@@ -1,4 +1,3 @@
-import 'package:agora/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'main_screen.dart';
@@ -52,12 +51,6 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const MainScreen()),
       );
     });
-  }
-
-  void _register() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const SignUpPage()),
-    );
   }
 
   @override
