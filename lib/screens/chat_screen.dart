@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'conversation_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -237,7 +238,17 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             )
           : null,
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConversationScreen(
+              userName: name,
+              userImage: 'https://i.pravatar.cc/150?u=$name', // 임시 프로필 이미지
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -309,7 +320,17 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             )
           : null,
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConversationScreen(
+              userName: name,
+              userImage: 'https://i.pravatar.cc/150?u=$name', // 임시 프로필 이미지
+            ),
+          ),
+        );
+      },
     );
   }
 }
