@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'conversation_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -7,7 +8,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -68,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Widget _buildFriendChatList() {
     final chats = [
       {
-        'name': '김철수',
+        'name': '김진규',
         'message': '내일 회의 시간이 바뀌었어',
         'time': '방금',
         'avatar': '👨',
@@ -236,7 +238,17 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               ),
             )
           : null,
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConversationScreen(
+              userName: name,
+              userImage: 'https://i.pravatar.cc/150?u=$name', // 임시 프로필 이미지
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -308,7 +320,17 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               ),
             )
           : null,
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConversationScreen(
+              userName: name,
+              userImage: 'https://i.pravatar.cc/150?u=$name', // 임시 프로필 이미지
+            ),
+          ),
+        );
+      },
     );
   }
 }

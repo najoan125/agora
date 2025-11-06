@@ -1,4 +1,6 @@
+import 'package:agora/screens/register_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'main_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -52,6 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  void _register() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const SignUpPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,36 +67,23 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Center(
+          child: Container(
+            height: MediaQuery.of(context).size.height - 50, // SafeArea 높이 고려
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Agora',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                // Logo (SVG)
+                SvgPicture.asset(
+                  'assets/images/logo.original.svg',
+                  width: 300,
+                  height: 100,
                 ),
-                const SizedBox(height: 40),
 
                 // Title
                 const Text(
                   'Agora에 접속하세요',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -111,7 +106,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     hintText: '이메일',
                     hintStyle: const TextStyle(color: Colors.grey),
-                    prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                    prefixIcon:
+                        const Icon(Icons.email_outlined, color: Colors.grey),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(color: Colors.grey),
@@ -122,7 +118,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.blue, width: 2),
+                      borderSide:
+                          const BorderSide(color: Colors.blue, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.grey[50],
@@ -138,10 +135,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: InputDecoration(
                     hintText: '비밀번호',
                     hintStyle: const TextStyle(color: Colors.grey),
-                    prefixIcon: const Icon(Icons.lock_outlined, color: Colors.grey),
+                    prefixIcon:
+                        const Icon(Icons.lock_outlined, color: Colors.grey),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: Colors.grey,
                       ),
                       onPressed: () {
@@ -160,7 +160,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.blue, width: 2),
+                      borderSide:
+                          const BorderSide(color: Colors.blue, width: 2),
                     ),
                     filled: true,
                     fillColor: Colors.grey[50],
@@ -206,7 +207,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                               strokeWidth: 2,
                             ),
                           )
