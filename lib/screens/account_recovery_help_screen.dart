@@ -214,7 +214,7 @@ class _AccountRecoveryHelpScreenState extends State<AccountRecoveryHelpScreen> {
                   controller: _descriptionController,
                   maxLines: 5,
                   decoration: InputDecoration(
-                    hintText: '겪고 계신 문제를 자세히 설명해주세요...',
+                    hintText: '문제를 자세히 설명해주세요...',
                     hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -293,7 +293,7 @@ class _AccountRecoveryHelpScreenState extends State<AccountRecoveryHelpScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      _buildFAQItem('• 스팸 폴더를 확인해보셨나요?'),
+                      _buildFAQItem('• 스팸함을 확인해보셨나요?'),
                       _buildFAQItem('• 올바른 이메일 주소를 입력하셨나요?'),
                       _buildFAQItem('• 이메일이 도착하는데 최대 10분이 걸릴 수 있습니다.'),
                     ],
