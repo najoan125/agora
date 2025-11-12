@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'policy_screen.dart';
+import 'policy_screen.dart' show termsOfServiceContent, privacyPolicyContent;
 //회원가입 페이지
 
 class SignupScreen extends StatefulWidget {
@@ -268,9 +270,24 @@ class _SignupScreenState extends State<SignupScreen> {
                   Expanded(
                     child: Wrap(
                       children: [
-                        const Text(
-                          '이용약관',
-                          style: TextStyle(color: Colors.grey),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const PolicyScreen(
+                                  title: '이용약관',
+                                  content: termsOfServiceContent,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            '이용약관',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
                         ),
                         const Text(
                           '과 ',
@@ -278,7 +295,14 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            // 개인정보처리방침 페이지로 이동
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const PolicyScreen(
+                                  title: '개인정보처리방침',
+                                  content: privacyPolicyContent,
+                                ),
+                              ),
+                            );
                           },
                           child: const Text(
                             '개인정보처리방침',
