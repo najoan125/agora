@@ -270,22 +270,25 @@ class _SignupScreenState extends State<SignupScreen> {
                   Expanded(
                     child: Wrap(
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const PolicyScreen(
-                                  title: '이용약관',
-                                  content: termsOfServiceContent,
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const PolicyScreen(
+                                    title: '이용약관',
+                                    content: termsOfServiceContent,
+                                  ),
                                 ),
+                              );
+                            },
+                            child: const Text(
+                              '이용약관',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
                               ),
-                            );
-                          },
-                          child: const Text(
-                            '이용약관',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),
@@ -293,22 +296,25 @@ class _SignupScreenState extends State<SignupScreen> {
                           '과 ',
                           style: TextStyle(color: Colors.grey),
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const PolicyScreen(
-                                  title: '개인정보처리방침',
-                                  content: privacyPolicyContent,
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const PolicyScreen(
+                                    title: '개인정보처리방침',
+                                    content: privacyPolicyContent,
+                                  ),
                                 ),
+                              );
+                            },
+                            child: const Text(
+                              '개인정보처리방침',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
                               ),
-                            );
-                          },
-                          child: const Text(
-                            '개인정보처리방침',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),
