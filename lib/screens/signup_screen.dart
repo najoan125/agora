@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'policy_screen.dart' show termsOfServiceContent, privacyPolicyContent, PolicyScreen;
 //회원가입 페이지
 
 class SignupScreen extends StatefulWidget {
@@ -247,6 +248,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               // Terms and Conditions
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
                     width: 24,
@@ -268,23 +270,51 @@ class _SignupScreenState extends State<SignupScreen> {
                   Expanded(
                     child: Wrap(
                       children: [
-                        const Text(
-                          '이용약관',
-                          style: TextStyle(color: Colors.grey),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const PolicyScreen(
+                                    title: '이용약관',
+                                    content: termsOfServiceContent,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              '이용약관',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
                         ),
                         const Text(
                           '과 ',
                           style: TextStyle(color: Colors.grey),
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            // 개인정보처리방침 페이지로 이동
-                          },
-                          child: const Text(
-                            '개인정보처리방침',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const PolicyScreen(
+                                    title: '개인정보처리방침',
+                                    content: privacyPolicyContent,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              '개인정보처리방침',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                              ),
                             ),
                           ),
                         ),
