@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:agora/screens/notification_settings_screen.dart';
+import 'package:agora/screens/privacy_settings_screen.dart';
+import 'package:agora/screens/security_settings_screen.dart';
+import 'package:agora/screens/help_screen.dart';
+import 'package:agora/screens/app_info_screen.dart';
+import 'package:agora/screens/edit_profile_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({Key? key}) : super(key: key);
@@ -58,7 +64,16 @@ class MoreScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 44,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(
+                              userName: '김철수',
+                              userEmail: 'kim.chulsu@agora.com',
+                            ),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         shape: RoundedRectangleBorder(
@@ -83,27 +98,57 @@ class MoreScreen extends StatelessWidget {
             _buildMenuItem(
               icon: Icons.notifications_outlined,
               title: '알림 설정',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationSettingsScreen(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(
               icon: Icons.privacy_tip_outlined,
               title: '개인정보 보호',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PrivacySettingsScreen(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(
               icon: Icons.lock_outlined,
               title: '보안',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SecuritySettingsScreen(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(
               icon: Icons.help_outline,
               title: '도움말',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const HelpScreen(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(
               icon: Icons.info_outline,
               title: '앱 정보',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AppInfoScreen(),
+                  ),
+                );
+              },
             ),
 
             const Divider(),
