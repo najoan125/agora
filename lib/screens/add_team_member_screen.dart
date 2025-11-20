@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-class AddFriendScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>) onFriendAdded;
+class AddTeamMemberScreen extends StatefulWidget {
+  final Function(String) onMemberAdded;
 
-  const AddFriendScreen({Key? key, required this.onFriendAdded})
+  const AddTeamMemberScreen({Key? key, required this.onMemberAdded})
       : super(key: key);
 
   @override
-  State<AddFriendScreen> createState() => _AddFriendScreenState();
+  State<AddTeamMemberScreen> createState() => _AddTeamMemberScreenState();
 }
 
-class _AddFriendScreenState extends State<AddFriendScreen>
+class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TextEditingController _searchController;
@@ -28,56 +28,55 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     '호주': '+61',
   };
 
-  // 모의 친구 데이터베이스
-  final List<Map<String, dynamic>> _availableFriends = [
+  // 모의 팀원 데이터베이스
+  final List<Map<String, dynamic>> _availableMembers = [
     {
       'name': '김철수',
       'phone': '010-1234-5678',
       'id': 'kim_cs',
       'avatar': '👨',
-      'isBirthday': false
     },
     {
       'name': '이영희',
       'phone': '010-2345-6789',
       'id': 'lee_yh',
       'avatar': '👩',
-      'isBirthday': true
     },
     {
       'name': '박민준',
       'phone': '010-3456-7890',
       'id': 'park_mj',
       'avatar': '👨',
-      'isBirthday': false
     },
     {
       'name': '최수진',
       'phone': '010-4567-8901',
       'id': 'choi_sj',
       'avatar': '👩',
-      'isBirthday': true
     },
     {
       'name': '정준호',
       'phone': '010-5678-9012',
       'id': 'jung_jh',
       'avatar': '👨',
-      'isBirthday': false
     },
     {
       'name': '홍길동',
       'phone': '010-6789-0123',
       'id': 'hong_gd',
       'avatar': '👨',
-      'isBirthday': true
     },
     {
       'name': '유미영',
       'phone': '010-7890-1234',
       'id': 'yu_my',
       'avatar': '👩',
-      'isBirthday': false
+    },
+    {
+      'name': '장예은',
+      'phone': '010-8901-2345',
+      'id': 'jang_ye',
+      'avatar': '👩',
     },
   ];
 
@@ -95,7 +94,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     super.dispose();
   }
 
-  void _searchFriend() {
+  void _searchMember() {
     if (_searchQuery.isEmpty) {
       setState(() {
         _searchResults = [];
@@ -110,13 +109,13 @@ class _AddFriendScreenState extends State<AddFriendScreen>
 
     // 검색 시뮬레이션 (0.5초 딜레이)
     Future.delayed(const Duration(milliseconds: 500), () {
-      final results = _availableFriends
-          .where((friend) =>
-              (friend['phone'] as String).contains(_searchQuery) ||
-              (friend['id'] as String)
+      final results = _availableMembers
+          .where((member) =>
+              (member['phone'] as String).contains(_searchQuery) ||
+              (member['id'] as String)
                   .toLowerCase()
                   .contains(_searchQuery.toLowerCase()) ||
-              (friend['name'] as String)
+              (member['name'] as String)
                   .toLowerCase()
                   .contains(_searchQuery.toLowerCase()))
           .toList();
@@ -128,11 +127,11 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     });
   }
 
-  void _addFriend(Map<String, dynamic> friend) {
-    widget.onFriendAdded(friend);
+  void _addMember(String memberName) {
+    widget.onMemberAdded(memberName);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${friend['name']}을(를) 친구로 추가했습니다'),
+        content: Text('$memberName을(를) 팀원으로 추가했습니다'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -144,7 +143,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          '친구추가',
+          '팀원 추가',
           style: TextStyle(
             color: Colors.black,
             fontSize: 24,
@@ -206,7 +205,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '전화번호로 친구 찾기',
+                '전화번호로 팀원 찾기',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -265,7 +264,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                             _searchQuery = value;
                           });
                         },
-                        onSubmitted: (_) => _searchFriend(),
+                        onSubmitted: (_) => _searchMember(),
                         decoration: InputDecoration(
                           hintText: '010-1234-5678',
                           hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -281,7 +280,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                       child: IconButton(
                         icon: const Icon(Icons.search,
                             color: Colors.grey, size: 20),
-                        onPressed: _searchFriend,
+                        onPressed: _searchMember,
                       ),
                     ),
                   ],
@@ -306,7 +305,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '아이디로 친구 찾기',
+                '아이디로 팀원 찾기',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -321,7 +320,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                     _searchQuery = value;
                   });
                 },
-                onSubmitted: (_) => _searchFriend(),
+                onSubmitted: (_) => _searchMember(),
                 decoration: InputDecoration(
                   hintText: 'abcd',
                   hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -342,7 +341,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                       : IconButton(
                           icon: const Icon(Icons.search,
                               color: Colors.grey, size: 20),
-                          onPressed: _searchFriend,
+                          onPressed: _searchMember,
                         ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -377,7 +376,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
             width: 200,
             height: 200,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.grey.shade300, width: 2),
             ),
@@ -389,7 +388,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
           ),
           const SizedBox(height: 24),
           Text(
-            'QR 코드로 친구 추가',
+            'QR 코드로 팀원 추가',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -398,30 +397,11 @@ class _AddFriendScreenState extends State<AddFriendScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            '친구의 QR 코드를 스캔하면\n친구를 추가할 수 있습니다',
+            '팀원의 QR 코드를 스캔하면\n팀원으로 추가할 수 있습니다',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: 200,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                _showQrScanDialog();
-              },
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('QR 코드 스캔'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade400,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
             ),
           ),
         ],
@@ -439,7 +419,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '추천 친구',
+                  '추천 팀원',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -453,9 +433,9 @@ class _AddFriendScreenState extends State<AddFriendScreen>
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _availableFriends.take(4).length,
+              itemCount: _availableMembers.take(4).length,
               itemBuilder: (context, index) {
-                final friend = _availableFriends[index];
+                final member = _availableMembers[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding:
@@ -476,7 +456,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                         ),
                         child: Center(
                           child: Text(
-                            friend['avatar'] as String,
+                            member['avatar'] as String,
                             style: const TextStyle(fontSize: 28),
                           ),
                         ),
@@ -487,7 +467,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              friend['name'] as String,
+                              member['name'] as String,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16,
@@ -495,7 +475,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              friend['phone'] as String,
+                              member['phone'] as String,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -505,7 +485,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => _addFriend(friend),
+                        onTap: () => _addMember(member['name'] as String),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
@@ -583,7 +563,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
       padding: const EdgeInsets.all(16),
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        final friend = _searchResults[index];
+        final member = _searchResults[index];
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -603,7 +583,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                 ),
                 child: Center(
                   child: Text(
-                    friend['avatar'] as String,
+                    member['avatar'] as String,
                     style: const TextStyle(fontSize: 28),
                   ),
                 ),
@@ -614,7 +594,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      friend['name'] as String,
+                      member['name'] as String,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
@@ -622,7 +602,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      friend['phone'] as String,
+                      member['phone'] as String,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -632,7 +612,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                 ),
               ),
               GestureDetector(
-                onTap: () => _addFriend(friend as Map<String, String>),
+                onTap: () => _addMember(member['name'] as String),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -651,70 +631,6 @@ class _AddFriendScreenState extends State<AddFriendScreen>
           ),
         );
       },
-    );
-  }
-
-  void _showQrScanDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('QR 코드 스캔'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 2),
-              ),
-              child: Icon(
-                Icons.qr_code_2,
-                size: 120,
-                color: Colors.grey.shade400,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'QR 코드를 카메라에 맞춰주세요',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              // 모의 QR 코드 스캔 결과
-              final scannedId = 'kim_cs';
-              final friend = _availableFriends
-                  .firstWhere((f) => f['id'] == scannedId, orElse: () => {});
-
-              Navigator.pop(context);
-
-              if (friend.isNotEmpty) {
-                _addFriend(friend as Map<String, String>);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('등록되지 않은 사용자입니다')),
-                );
-              }
-            },
-            icon: const Icon(Icons.check),
-            label: const Text('스캔 완료'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade400,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

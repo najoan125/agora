@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'profile_screen.dart';
+import 'my_profile_screen.dart';
 import 'add_friend_screen.dart';
 import 'team_detail_screen.dart';
-import 'team_chat_screen.dart';
 import 'add_team_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,13 +17,72 @@ class _HomeScreenState extends State<HomeScreen>
   late TabController _tabController;
   List<Map<String, dynamic>> _friends = [];
   List<Map<String, dynamic>> _blockedFriends = [];
-  List<Map<String, dynamic>> _teamMembers = [];
+  List<Map<String, dynamic>> _friendRequests = [
+    {
+      'name': '박영수',
+      'phone': '010-1234-5678',
+      'avatar': '👨',
+      'requestDate': '2024.01.20'
+    },
+    {
+      'name': '최지은',
+      'phone': '010-2345-6789',
+      'avatar': '👩',
+      'requestDate': '2024.01.18'
+    },
+    {
+      'name': '이재훈',
+      'phone': '010-3456-7890',
+      'avatar': '👨',
+      'requestDate': '2024.01.15'
+    },
+  ];
+  List<Map<String, dynamic>> _teamInvitations = [
+    {
+      'teamName': '영업팀',
+      'icon': '🎯',
+      'invitedBy': '김철수',
+      'inviteDate': '2024.01.20'
+    },
+    {
+      'teamName': 'HR팀',
+      'icon': '👥',
+      'invitedBy': '이영희',
+      'inviteDate': '2024.01.18'
+    },
+  ];
+  List<Map<String, dynamic>> _teams = [
+    {
+      'name': '개발팀',
+      'member': '5명',
+      'icon': '👨‍💻',
+      'members': ['김철수', '이순신', '박준호', '정재훈', '최동욱']
+    },
+    {
+      'name': '마케팅팀',
+      'member': '3명',
+      'icon': '📊',
+      'members': ['이영희', '최수진', '홍명희']
+    },
+    {
+      'name': '디자인팀',
+      'member': '4명',
+      'icon': '🎨',
+      'members': ['장예은', '유미영', '조은희', '김지은']
+    },
+    {
+      'name': '기획팀',
+      'member': '2명',
+      'icon': '📋',
+      'members': ['박민준', '정준호']
+    },
+  ];
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -115,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen>
           indicatorWeight: 3,
           tabs: const [
             Tab(text: '친구'),
+            Tab(text: '친구 신청'),
             Tab(text: '팀원'),
             Tab(text: '차단'),
           ],
@@ -124,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen>
         controller: _tabController,
         children: [
           _buildFriendsList(),
+          _buildFriendRequestsList(),
           _buildTeamList(),
           _buildBlockedFriendsList(),
         ],
@@ -138,62 +199,72 @@ class _HomeScreenState extends State<HomeScreen>
           // 내 프로필 카드
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MyProfileScreen(),
                   ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade100, Colors.cyan.shade100],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          colors: [Colors.blue.shade100, Colors.cyan.shade100],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text('🧑', style: TextStyle(fontSize: 36)),
                       ),
                     ),
-                    child: Center(
-                      child: Text('🧑', style: TextStyle(fontSize: 36)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'OOO 프로필',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OOO 프로필',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '상세메세지',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
+                          const SizedBox(height: 4),
+                          Text(
+                            '상세메세지',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -482,33 +553,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildTeamList() {
-    final teams = [
-      {
-        'name': '개발팀',
-        'member': '5명',
-        'icon': '👨‍💻',
-        'members': ['김철수', '이순신', '박준호', '정재훈', '최동욱']
-      },
-      {
-        'name': '마케팅팀',
-        'member': '3명',
-        'icon': '📊',
-        'members': ['이영희', '최수진', '홍명희']
-      },
-      {
-        'name': '디자인팀',
-        'member': '4명',
-        'icon': '🎨',
-        'members': ['장예은', '유미영', '조은희', '김지은']
-      },
-      {
-        'name': '기획팀',
-        'member': '2명',
-        'icon': '📋',
-        'members': ['박민준', '정준호']
-      },
-    ];
-
     return Column(
       children: [
         // 내 프로필 카드
@@ -578,6 +622,153 @@ class _HomeScreenState extends State<HomeScreen>
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
+              // 팀 초대 섹션
+              if (_teamInvitations.isNotEmpty) ...[
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.mail_outline, size: 18, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Text(
+                        '팀 초대 (${_teamInvitations.length})',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ..._teamInvitations.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final invitation = entry.value;
+                  return Container(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  invitation['icon'],
+                                  style: const TextStyle(fontSize: 28),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    invitation['teamName'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${invitation['invitedBy']}님이 초대했습니다',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.check),
+                                label: const Text('수락'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade400,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _teams.add({
+                                      'name': invitation['teamName'],
+                                      'member': '1명',
+                                      'icon': invitation['icon'],
+                                      'members': [],
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            '${invitation['teamName']}에 가입했습니다'),
+                                      ),
+                                    );
+                                    _teamInvitations.removeAt(index);
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.close),
+                                label: const Text('거절'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red.shade400,
+                                  side: BorderSide(color: Colors.red.shade400),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            '${invitation['teamName']} 초대를 거절했습니다'),
+                                      ),
+                                    );
+                                    _teamInvitations.removeAt(index);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                const SizedBox(height: 16),
+              ],
               // 팀 추가 버튼
               Padding(
                 padding:
@@ -590,12 +781,17 @@ class _HomeScreenState extends State<HomeScreen>
                         builder: (context) => AddTeamScreen(
                           onTeamAdded: (team) {
                             setState(() {
-                              // 팀 추가 로직
-                              _teamMembers.add({
+                              // 팀 멤버 수 계산
+                              final memberCount = team['members'] != null
+                                  ? (team['members'] as List).length
+                                  : 0;
+
+                              _teams.add({
                                 'name': team['name'],
-                                'member': team['member'],
+                                'member':
+                                    memberCount > 0 ? '$memberCount명' : '0명',
                                 'icon': team['icon'],
-                                'members': team['members'],
+                                'members': team['members'] ?? [],
                               });
                             });
                           },
@@ -604,7 +800,7 @@ class _HomeScreenState extends State<HomeScreen>
                     );
                   },
                   icon: const Icon(Icons.add),
-                  label: const Text('팀 추가'),
+                  label: const Text('팀 만들기'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade400,
                     foregroundColor: Colors.white,
@@ -616,12 +812,15 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
               // 팀 목록
-              ...teams.map((team) {
+              ..._teams.map((team) {
+                final members = team['members'] is List
+                    ? List<String>.from(team['members'] as List)
+                    : <String>[];
                 return _buildTeamTile(
                   name: team['name'] as String,
                   member: team['member'] as String,
                   icon: team['icon'] as String,
-                  members: team['members'] as List<String>,
+                  members: members,
                 );
               }).toList(),
             ],
@@ -802,6 +1001,155 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
       ),
+    );
+  }
+
+  Widget _buildFriendRequestsList() {
+    if (_friendRequests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(
+              '친구 신청이 없습니다',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _friendRequests.length,
+      itemBuilder: (context, index) {
+        final request = _friendRequests[index];
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(request['avatar'] ?? '👤',
+                        style: const TextStyle(fontSize: 28)),
+                  ),
+                ),
+                title: Text(
+                  request['name'] ?? '알 수 없음',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      request['phone'] ?? '010-0000-0000',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '신청일: ${request['requestDate'] ?? '2024-01-01'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.check),
+                        label: const Text('수락'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade400,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _friends.add({
+                              'name': request['name'],
+                              'statusMessage': '',
+                              'avatar': request['avatar'],
+                              'isFavorite': false,
+                              'birthday': '',
+                              'phone': request['phone'],
+                            });
+                            _friendRequests.removeAt(index);
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${request['name']}을(를) 친구로 추가했습니다',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.close),
+                        label: const Text('거절'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade400,
+                          side: BorderSide(color: Colors.red.shade400),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _friendRequests.removeAt(index);
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${request['name']}의 친구 신청을 거절했습니다',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -19,6 +19,20 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isFavorite = false;
+  String _nickname = '';
+  late TextEditingController _nicknameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nicknameController = TextEditingController(text: _nickname);
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -185,6 +199,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 별명 설정 섹션
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  leading: const Icon(Icons.edit, color: Colors.blue),
+                  title: const Text(
+                    '별명 설정',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _nickname.isEmpty ? '별명을 설정하세요' : '현재: $_nickname',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right,
+                      color: Colors.blue, size: 20),
+                  onTap: () {
+                    _showNicknameDialog();
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 팀원 추가 버튼
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('팀원으로 추가했습니다')),
+                    );
+                  },
+                  icon: const Icon(Icons.group_add),
+                  label: const Text('팀원으로 추가'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade400,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -394,6 +465,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }
             },
             child: const Text('신고'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNicknameDialog() {
+    _nicknameController.text = _nickname;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('별명 설정'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '나에게만 보이는 별명을 설정하세요',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nicknameController,
+              decoration: InputDecoration(
+                hintText: '별명을 입력하세요',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.blue.shade400),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade400,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _nickname = _nicknameController.text;
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      '별명이 저장되었습니다: ${_nickname.isEmpty ? "없음" : _nickname}'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('저장'),
           ),
         ],
       ),

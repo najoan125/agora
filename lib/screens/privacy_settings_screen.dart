@@ -69,7 +69,7 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
               ),
               trailing: DropdownButton<String>(
                 value: _profileVisibility,
-                items: ['모두', '친구만', '나만'].map((String value) {
+                items: ['모두', '친구만', '친구 + 팀원', '나만'].map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Text(value),
@@ -163,6 +163,44 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             ),
             const SizedBox(height: 20),
 
+            // 차단된 사용자
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '차단 관리',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              title: const Text(
+                '차단한 사용자 관리',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                '차단한 친구, 팀원, 채팅창을 관리합니다',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+              onTap: () {
+                _showBlockedUsersManagement(context);
+              },
+            ),
+            const SizedBox(height: 20),
+
             // 정보 박스
             Container(
               margin: const EdgeInsets.all(20),
@@ -211,6 +249,109 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
         value: value,
         onChanged: onChanged,
         activeColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _showBlockedUsersManagement(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('차단 관리'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '친구',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildBlockedItemTile('박영수', '친구', '2024.01.01'),
+              _buildBlockedItemTile('이민준', '친구', '2023.12.15'),
+              const SizedBox(height: 16),
+              const Text(
+                '팀원',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildBlockedItemTile('김철수', '팀원', '2024.01.05'),
+              const SizedBox(height: 16),
+              const Text(
+                '채팅',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildBlockedItemTile('개발팀', '팀 채팅', '2024.01.10'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBlockedItemTile(String name, String type, String date) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$type · $date',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {},
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(50, 20),
+            ),
+            child: const Text(
+              '해제',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

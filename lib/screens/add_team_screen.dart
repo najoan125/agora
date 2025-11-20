@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'add_team_member_screen.dart';
 
 class AddTeamScreen extends StatefulWidget {
   final Function(Map<String, dynamic>) onTeamAdded;
@@ -70,7 +71,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('팀 추가'),
+        title: const Text('팀 만들기'),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
@@ -90,50 +91,93 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemCount: _availableIcons.length,
-                itemBuilder: (context, index) {
-                  final icon = _availableIcons[index];
-                  final isSelected = _selectedIcon == icon;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedIcon = icon;
-                      });
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue.shade200 : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected
-                              ? Colors.blue.shade400
-                              : Colors.grey.shade300,
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          icon,
-                          style: const TextStyle(fontSize: 28),
-                        ),
-                      ),
+            GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('아이콘 선택'),
+                    content: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _availableIcons.map((icon) {
+                        final isSelected = _selectedIcon == icon;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedIcon = icon;
+                            });
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.blue.shade200
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Colors.blue.shade400
+                                    : Colors.grey.shade300,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                icon,
+                                style: const TextStyle(fontSize: 32),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
-                  );
-                },
+                  ),
+                );
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _selectedIcon,
+                            style: const TextStyle(fontSize: 28),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '현재 선택: $_selectedIcon',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -202,22 +246,56 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            // 팀 추가 버튼
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _addTeam,
-                icon: const Icon(Icons.add),
-                label: const Text('팀 추가'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade400,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // 버튼들
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _addTeam,
+                    icon: const Icon(Icons.add),
+                    label: const Text('팀 만들기'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade400,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddTeamMemberScreen(
+                            onMemberAdded: (memberName) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('$memberName을(를) 추가했습니다'),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('팀원 추가'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade400,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
