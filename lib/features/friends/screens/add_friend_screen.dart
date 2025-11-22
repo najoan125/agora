@@ -152,6 +152,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           '친구추가',
@@ -210,9 +211,11 @@ class _AddFriendScreenState extends State<AddFriendScreen>
   Widget _buildPhoneSearchTab() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+        Container(
+          color: Colors.grey[50],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -226,7 +229,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -280,6 +283,8 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                           hintText: '010-1234-5678',
                           hintStyle: TextStyle(color: Colors.grey.shade400),
                           border: InputBorder.none,
+                          filled: false,
+                          fillColor: Colors.transparent,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 16),
                         ),
@@ -299,6 +304,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
               ),
             ],
           ),
+        ),
         ),
         Expanded(
           child: _buildSearchResultsList(),
@@ -324,48 +330,47 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                onSubmitted: (_) => _searchFriend(),
-                decoration: InputDecoration(
-                  hintText: 'abcd',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  prefixIcon: const Icon(Icons.person_outline,
-                      color: Colors.grey, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                              _searchResults = [];
-                            });
-                          },
-                          child: const Icon(Icons.close,
-                              color: Colors.grey, size: 20),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.search,
-                              color: Colors.grey, size: 20),
-                          onPressed: _searchFriend,
-                        ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  onSubmitted: (_) => _searchFriend(),
+                  decoration: InputDecoration(
+                    hintText: 'abcd',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Colors.grey, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                                _searchResults = [];
+                              });
+                            },
+                            child: const Icon(Icons.close,
+                                color: Colors.grey, size: 20),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.search,
+                                color: Colors.grey, size: 20),
+                            onPressed: _searchFriend,
+                          ),
+                    border: InputBorder.none,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
                 ),
               ),
             ],

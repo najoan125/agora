@@ -28,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _menuAnimationController;
   final FocusNode _searchFocusNode = FocusNode();
+  String _sortOption = 'recent'; // 'recent' or 'name'
   String _searchQuery = '';
   final List<String> _recentSearches = ['등산', '프로젝트', '회식', '스터디'];
   bool _isMenuOpen = false;
@@ -176,43 +177,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildMenuItem('친구 추가', Icons.person_add_outlined, () {
+                      _buildMenuItem('정렬하기', Icons.sort, () {
                         _toggleMenu();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddFriendScreen(
-                              onFriendAdded: (friend) {
-                                setState(() {
-                                  _dataManager.addFriend(friend);
-                                });
-                              },
-                            ),
-                          ),
-                        );
-                      }),
-                      _buildMenuItem('팀별 추가', Icons.group_add_outlined, () {
-                        _toggleMenu();
-                        // TODO: Navigate to team member add screen
-                      }),
-                      _buildMenuItem('팀채팅 생성', Icons.chat_bubble_outline, () {
-                        _toggleMenu();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddTeamScreen(
-                              onTeamAdded: (team) {
-                                setState(() {
-                                  _dataManager.addTeam(team);
-                                });
-                              },
-                            ),
-                          ),
-                        );
-                      }),
-                      _buildMenuItem('그룹 생성', Icons.group_outlined, () {
-                        _toggleMenu();
-                        // TODO: Navigate to group creation screen
+                        _showSortDialog();
                       }),
                     ],
                   ),
@@ -220,6 +187,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
       ],
+    );
+  }
+
+  void _showSortDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('정렬'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.access_time),
+              title: const Text('최신순'),
+              onTap: () {
+                setState(() {
+                  _sortOption = 'recent';
+                });
+                Navigator.pop(context);
+              },
+              trailing: _sortOption == 'recent' ? const Icon(Icons.check, color: Colors.blue) : null,
+            ),
+            ListTile(
+              leading: const Icon(Icons.sort_by_alpha),
+              title: const Text('이름순'),
+              onTap: () {
+                setState(() {
+                  _sortOption = 'name';
+                });
+                Navigator.pop(context);
+              },
+              trailing: _sortOption == 'name' ? const Icon(Icons.check, color: Colors.blue) : null,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -251,8 +254,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final friends = _dataManager.friends;
     
     final filteredFriends = _searchQuery.isEmpty
-        ? friends
+        ? List<Map<String, dynamic>>.from(friends)
         : friends.where((f) => f['name'].toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    if (_sortOption == 'name') {
+      filteredFriends.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+    }
+    // 'recent' option keeps the original order (assuming it's already sorted by recent or default)
 
     final favorites = filteredFriends.where((f) => f['isFavorite'] == true).toList();
     final birthdays = filteredFriends.where((f) => f['isBirthday'] == true).toList();
@@ -772,8 +780,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
             const SizedBox(height: 20),
             const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
-            const SizedBox(height: 20),
-
+            
             // Team List
             Column(
               children: teams.map((team) => _buildTeamTile(team)).toList(),
@@ -856,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             MaterialPageRoute(
               builder: (context) => TeamDetailScreen(
                 teamName: team['name'],
-                teamIcon: team['icon'],
+                teamIcon: team['icon'] ?? '🛡️',
                 members: List<String>.from(team['members'] ?? []),
                 teamImage: team['image'] ??
                     'https://picsum.photos/seed/${team['name']}/200/200',

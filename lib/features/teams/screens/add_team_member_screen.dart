@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 
 class AddTeamMemberScreen extends StatefulWidget {
-  final Function(String) onMemberAdded;
+  final Function(Map<String, dynamic>) onMemberAdded;
 
   const AddTeamMemberScreen({Key? key, required this.onMemberAdded})
       : super(key: key);
@@ -35,49 +35,49 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
       'name': '김철수',
       'phone': '010-1234-5678',
       'id': 'kim_cs',
-      'avatar': '👨',
+      'image': 'https://picsum.photos/seed/kim_cs/200/200',
     },
     {
       'name': '이영희',
       'phone': '010-2345-6789',
       'id': 'lee_yh',
-      'avatar': '👩',
+      'image': 'https://picsum.photos/seed/lee_yh/200/200',
     },
     {
       'name': '박민준',
       'phone': '010-3456-7890',
       'id': 'park_mj',
-      'avatar': '👨',
+      'image': 'https://picsum.photos/seed/park_mj/200/200',
     },
     {
       'name': '최수진',
       'phone': '010-4567-8901',
       'id': 'choi_sj',
-      'avatar': '👩',
+      'image': 'https://picsum.photos/seed/choi_sj/200/200',
     },
     {
       'name': '정준호',
       'phone': '010-5678-9012',
       'id': 'jung_jh',
-      'avatar': '👨',
+      'image': 'https://picsum.photos/seed/jung_jh/200/200',
     },
     {
       'name': '홍길동',
       'phone': '010-6789-0123',
       'id': 'hong_gd',
-      'avatar': '👨',
+      'image': 'https://picsum.photos/seed/hong_gd/200/200',
     },
     {
       'name': '유미영',
       'phone': '010-7890-1234',
       'id': 'yu_my',
-      'avatar': '👩',
+      'image': 'https://picsum.photos/seed/yu_my/200/200',
     },
     {
       'name': '장예은',
       'phone': '010-8901-2345',
       'id': 'jang_ye',
-      'avatar': '👩',
+      'image': 'https://picsum.photos/seed/jang_ye/200/200',
     },
   ];
 
@@ -128,11 +128,11 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
     });
   }
 
-  void _addMember(String memberName) {
-    widget.onMemberAdded(memberName);
+  void _addMember(Map<String, dynamic> member) {
+    widget.onMemberAdded(member);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$memberName을(를) 팀원으로 추가했습니다'),
+        content: Text('${member['name']}을(를) 팀원으로 추가했습니다'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -142,6 +142,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           '팀원 추가',
@@ -216,7 +217,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -270,6 +271,8 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                           hintText: '010-1234-5678',
                           hintStyle: TextStyle(color: Colors.grey.shade400),
                           border: InputBorder.none,
+                          filled: false,
+                          fillColor: Colors.transparent,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 16),
                         ),
@@ -314,48 +317,47 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                onSubmitted: (_) => _searchMember(),
-                decoration: InputDecoration(
-                  hintText: 'abcd',
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                  prefixIcon: const Icon(Icons.person_outline,
-                      color: Colors.grey, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                              _searchResults = [];
-                            });
-                          },
-                          child: const Icon(Icons.close,
-                              color: Colors.grey, size: 20),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.search,
-                              color: Colors.grey, size: 20),
-                          onPressed: _searchMember,
-                        ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  onSubmitted: (_) => _searchMember(),
+                  decoration: InputDecoration(
+                    hintText: 'abcd',
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: Colors.grey, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                                _searchResults = [];
+                              });
+                            },
+                            child: const Icon(Icons.close,
+                                color: Colors.grey, size: 20),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.search,
+                                color: Colors.grey, size: 20),
+                            onPressed: _searchMember,
+                          ),
+                    border: InputBorder.none,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
                 ),
               ),
             ],
@@ -453,12 +455,10 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                         height: 60,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            member['avatar'] as String,
-                            style: const TextStyle(fontSize: 28),
+                          borderRadius: BorderRadius.circular(20),
+                          image: DecorationImage(
+                            image: NetworkImage(member['image'] as String),
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
@@ -486,7 +486,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => _addMember(member['name'] as String),
+                        onTap: () => _addMember(member),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
@@ -580,12 +580,10 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                 height: 60,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    member['avatar'] as String,
-                    style: const TextStyle(fontSize: 28),
+                  borderRadius: BorderRadius.circular(20),
+                  image: DecorationImage(
+                    image: NetworkImage(member['image'] as String),
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -613,7 +611,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                 ),
               ),
               GestureDetector(
-                onTap: () => _addMember(member['name'] as String),
+                onTap: () => _addMember(member),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

@@ -18,6 +18,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _teamDescriptionController;
   String _selectedImage = 'https://picsum.photos/id/1005/200/200';
+  List<Map<String, dynamic>> _selectedMembers = [];
 
   final List<String> _availableImages = [
     'https://picsum.photos/id/1005/200/200',
@@ -54,9 +55,10 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
 
     final newTeam = {
       'name': _teamNameController.text,
-      'member': '0명',
-      'image': _selectedImage, // Changed from icon to image
-      'members': [],
+      'member': '${_selectedMembers.length}명',
+      'icon': '🛡️',
+      'image': _selectedImage,
+      'members': _selectedMembers.map((m) => m['name']).toList(),
     };
 
     widget.onTeamAdded(newTeam);
@@ -248,7 +250,56 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
                 fillColor: Colors.grey.shade50,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
+            
+            // 선택된 팀원 표시
+            if (_selectedMembers.isNotEmpty) ...[
+              Text(
+                '추가된 팀원',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _selectedMembers.map((member) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              image: DecorationImage(
+                                image: NetworkImage(member['image']),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            member['name'],
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ] else
+              const SizedBox(height: 32),
+
             // 버튼들
             Row(
               children: [
@@ -275,10 +326,15 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => AddTeamMemberScreen(
-                            onMemberAdded: (memberName) {
+                            onMemberAdded: (member) {
+                              setState(() {
+                                if (!_selectedMembers.any((m) => m['id'] == member['id'])) {
+                                  _selectedMembers.add(member);
+                                }
+                              });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('$memberName을(를) 추가했습니다'),
+                                  content: Text('${member['name']}을(를) 추가했습니다'),
                                 ),
                               );
                             },

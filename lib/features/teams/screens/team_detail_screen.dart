@@ -27,11 +27,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _noticeController;
   Map<String, String> _memberNicknames = {};
+  late String _teamName;
 
   @override
   void initState() {
     super.initState();
     _members = List<String>.from(widget.members);
+    _teamName = widget.teamName;
     _teamNameController = TextEditingController(text: widget.teamName);
     _noticeController = TextEditingController(text: '');
   }
@@ -48,8 +50,9 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddTeamMemberScreen(
-          onMemberAdded: (memberName) {
+          onMemberAdded: (member) {
             setState(() {
+              final memberName = member['name'] as String;
               if (!_members.contains(memberName)) {
                 _members.add(memberName);
               }
@@ -119,12 +122,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: 'notice',
+                value: 'delete',
                 child: const Row(
                   children: [
-                    Icon(Icons.notifications, size: 18, color: Colors.green),
+                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
                     SizedBox(width: 12),
-                    Text('팀 공지 설정'),
+                    Text('팀 삭제', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
@@ -132,8 +135,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
             onSelected: (value) {
               if (value == 'rename') {
                 _showTeamRenameDialog();
-              } else if (value == 'notice') {
-                _showTeamNoticeDialog();
+              } else if (value == 'delete') {
+                _showDeleteTeamDialog();
               }
             },
           ),
@@ -168,7 +171,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                       image: DecorationImage(
                         image: NetworkImage(
-                          widget.teamImage ?? 'https://picsum.photos/seed/${widget.teamName}/200/200',
+                          widget.teamImage ?? 'https://picsum.photos/seed/$_teamName/200/200',
                         ),
                         fit: BoxFit.cover,
                       ),
@@ -176,7 +179,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.teamName,
+                    _teamName,
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 24,
@@ -201,7 +204,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => TeamChatScreen(
-                              teamName: widget.teamName,
+                              teamName: _teamName,
                               teamIcon: widget.teamIcon,
                               teamImage: widget.teamImage,
                               members: _members,
@@ -429,10 +432,13 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () {
+              setState(() {
+                _teamName = _teamNameController.text;
+              });
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('팀 이름이 변경되었습니다: ${_teamNameController.text}'),
+                  content: Text('팀 이름이 변경되었습니다: $_teamName'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -444,42 +450,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     );
   }
 
-  void _showTeamNoticeDialog() {
+  void _showDeleteTeamDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('팀 공지 설정'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '팀 공지를 입력하세요',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _noticeController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: '팀 공지 내용을 입력해주세요',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.blue.shade400),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-              ),
-            ),
-          ],
-        ),
+        title: const Text('팀 삭제'),
+        content: const Text('정말로 팀을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -487,19 +463,20 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade400,
+              backgroundColor: Colors.red.shade400,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close screen
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('팀 공지가 설정되었습니다'),
+                  content: Text('팀이 삭제되었습니다'),
                   duration: Duration(seconds: 2),
                 ),
               );
             },
-            child: const Text('저장'),
+            child: const Text('삭제'),
           ),
         ],
       ),
