@@ -19,6 +19,7 @@ class ConversationScreen extends StatefulWidget {
 }
 
 class _ConversationScreenState extends State<ConversationScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
@@ -79,12 +80,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: AppTheme.textPrimary, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -95,14 +98,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
               decoration: BoxDecoration(
                 color: widget.isTeam ? Colors.blue[50] : Colors.grey[200],
                 borderRadius: BorderRadius.circular(12),
-                image: widget.userImage.isNotEmpty && widget.userImage.startsWith('http')
+                image: widget.userImage.isNotEmpty &&
+                        widget.userImage.startsWith('http')
                     ? DecorationImage(
                         image: NetworkImage(widget.userImage),
                         fit: BoxFit.cover,
                       )
                     : null,
               ),
-              child: widget.userImage.isEmpty || !widget.userImage.startsWith('http')
+              child: widget.userImage.isEmpty ||
+                      !widget.userImage.startsWith('http')
                   ? Center(
                       child: Text(
                         widget.isTeam ? '👥' : '👤',
@@ -136,8 +141,216 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.black),
+            onPressed: () {
+              // 검색 기능 구현
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_horiz, color: Colors.black),
+            onPressed: () {
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
+          ),
           const SizedBox(width: 8),
         ],
+      ),
+      endDrawer: Drawer(
+        width: MediaQuery.of(context).size.width * 0.8,
+        child: Column(
+          children: [
+            SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '대화상대',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Current User (Me)
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                            image: const DecorationImage(
+                              image: NetworkImage(
+                                  'https://picsum.photos/id/1005/200/200'), // My image
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          '나',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Other User
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                            image: widget.userImage.isNotEmpty &&
+                                    widget.userImage.startsWith('http')
+                                ? DecorationImage(
+                                    image: NetworkImage(widget.userImage),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: widget.userImage.isEmpty ||
+                                  !widget.userImage.startsWith('http')
+                              ? const Icon(Icons.person, color: Colors.grey)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          widget.userName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showInviteDialog(context);
+                      },
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: const Icon(Icons.add, color: Colors.grey),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            '대화상대 초대',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('사진/동영상'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '사진/동영상 보관함'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.folder_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('파일'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '파일 보관함'),
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.link, color: AppTheme.textPrimary),
+                    title: const Text('링크'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '링크 보관함'),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_off_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('알림 끄기'),
+                    trailing: Switch(value: false, onChanged: (v) {}),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              color: AppTheme.surfaceColor,
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined,
+                        color: AppTheme.textSecondary),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showSettings(context);
+                    },
+                  ),
+                  IconButton(
+                    icon:
+                        const Icon(Icons.logout, color: AppTheme.textSecondary),
+                    onPressed: () {
+                      Navigator.pop(context); // Close drawer
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('나가기'),
+                          content: const Text('채팅방을 나가시겠습니까?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('취소'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              },
+                              child: const Text('나가기',
+                                  style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -320,36 +533,142 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+  void _showInviteDialog(BuildContext context) {
+    final friends = [
+      {'name': '김철수', 'image': 'https://picsum.photos/id/1011/200/200'},
+      {'name': '이영희', 'image': 'https://picsum.photos/id/1027/200/200'},
+      {'name': '박지성', 'image': 'https://picsum.photos/id/1005/200/200'},
+      {'name': '최민호', 'image': 'https://picsum.photos/id/1012/200/200'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('대화상대 초대'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: friends.length,
+            itemBuilder: (context, index) {
+              final friend = friends[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: NetworkImage(friend['image']!),
+                ),
+                title: Text(friend['name']!),
+                trailing: Checkbox(
+                  value: false,
+                  onChanged: (value) {},
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showToast(context, '초대 메시지를 보냈습니다');
+            },
+            child: const Text('초대'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '채팅방 설정',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              title: const Text('채팅방 이름 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('배경화면 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('알림 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            const Divider(),
+            ListTile(
+              title: const Text('대화 내용 내보내기'),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('대화 내용 모두 삭제'),
+              textColor: Colors.red,
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
       ),
       child: SafeArea(
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.attach_file, color: Colors.grey),
+              icon: const Icon(Icons.attach_file, color: Color(0xFF999999)),
               onPressed: () {
                 _showAttachmentMenu(context);
               },
             ),
             IconButton(
-              icon: const Icon(Icons.camera_alt_outlined, color: Colors.grey),
+              icon: const Icon(Icons.camera_alt_outlined,
+                  color: Color(0xFF999999)),
               onPressed: () {
                 _openCamera(context);
               },
             ),
             IconButton(
-              icon: const Icon(Icons.auto_awesome, color: Colors.blue),
+              icon: const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
               onPressed: () {
                 _showAIMenu(context);
               },
@@ -366,13 +685,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   decoration: const InputDecoration(
                     hintText: '메시지를 입력하세요',
                     filled: false,
-                    fillColor: Colors.transparent,
                     border: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     errorBorder: InputBorder.none,
                     disabledBorder: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.grey),
+                    hintStyle: TextStyle(color: Color(0xFF999999)),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
                   ),
                   onSubmitted: _handleSubmitted,
                 ),
@@ -380,7 +699,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.send, color: Colors.blue, size: 24),
+              icon: const Icon(Icons.send, color: Color(0xFF0095F6), size: 28),
               onPressed: () => _handleSubmitted(_messageController.text),
             ),
           ],
@@ -423,7 +742,8 @@ class MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
@@ -447,7 +767,8 @@ class MessageBubble extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               if (!isMe) ...[
                 Padding(
@@ -478,10 +799,16 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ],
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      gradient: isMe ? AppTheme.primaryGradient : null,
-                      color: isMe ? null : Colors.grey[200],
+                      color: isMe
+                          ? const Color(0xFF0095F6)
+                          : const Color(
+                              0xFFF0F0F0), // Solid blue for me, light grey for others
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(20),
                         topRight: const Radius.circular(20),
@@ -492,7 +819,7 @@ class MessageBubble extends StatelessWidget {
                     child: Text(
                       message,
                       style: TextStyle(
-                        color: isMe ? Colors.white : AppTheme.textPrimary,
+                        color: isMe ? Colors.white : Colors.black,
                         fontSize: 15,
                       ),
                     ),
@@ -513,7 +840,6 @@ class MessageBubble extends StatelessWidget {
               ),
             ],
           ),
-          if (isMe) const SizedBox(width: 24), // Spacing for alignment
         ],
       ),
     );

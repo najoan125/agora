@@ -1,5 +1,6 @@
 // 그룹 채팅 대화 화면
 import 'package:flutter/material.dart';
+import '../../../core/theme.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupName;
@@ -18,12 +19,10 @@ class GroupChatScreen extends StatefulWidget {
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
-  final TextEditingController _searchController = TextEditingController();
   List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
-  bool _showSearch = false;
-  List<ChatMessage> _searchResults = [];
 
   @override
   void initState() {
@@ -34,7 +33,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   void _initializeMessages() {
     final members = widget.members;
     if (members.isEmpty) {
-       _messages = [
+      _messages = [
         ChatMessage(
           text: '안녕하세요! 반갑습니다.',
           isMe: false,
@@ -94,7 +93,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 text: "좋아요!",
                 isMe: false,
                 time: DateTime.now(),
-                sender: widget.members[DateTime.now().millisecond % widget.members.length],
+                sender: widget.members[
+                    DateTime.now().millisecond % widget.members.length],
               ),
             );
           });
@@ -103,350 +103,326 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-  void _searchMessages(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _searchResults = [];
-      } else {
-        _searchResults = _messages
-            .where(
-                (msg) => msg.text.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.groupName,
               style: const TextStyle(
-                color: Colors.black,
+                color: AppTheme.textPrimary,
                 fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               '${widget.members.length + 1}명',
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: AppTheme.textSecondary,
                 fontSize: 12,
               ),
             ),
           ],
         ),
-        centerTitle: true,
         actions: [
-          // 검색 아이콘
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black),
             onPressed: () {
-              setState(() {
-                _showSearch = !_showSearch;
-                if (!_showSearch) {
-                  _searchController.clear();
-                  _searchResults = [];
-                }
-              });
+              // 검색 기능 구현
             },
           ),
-          // 설정 아이콘
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.more_horiz, color: Colors.black),
-            itemBuilder: (BuildContext context) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        '그룹 정보',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
+            onPressed: () {
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      endDrawer: Drawer(
+        width: MediaQuery.of(context).size.width * 0.8,
+        child: Column(
+          children: [
+            SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '대화상대',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Group Info
+                    Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(16),
+                            image: widget.groupImage != null
+                                ? DecorationImage(
+                                    image: NetworkImage(widget.groupImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: widget.groupImage == null
+                              ? const Center(
+                                  child: Text('👥',
+                                      style: TextStyle(fontSize: 24)))
+                              : null,
                         ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.groupName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '멤버 ${widget.members.length + 1}명',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Member List
+                    SizedBox(
+                      height: 150, // Limit height for member list
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          // Me
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: const DecorationImage(
+                                      image: NetworkImage(
+                                          'https://picsum.photos/id/1005/200/200'), // My image
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  '나',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Other Members
+                          ...widget.members.map((member) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(12),
+                                        image: DecorationImage(
+                                          image: NetworkImage(
+                                            'https://picsum.photos/seed/${member.hashCode}/200/200',
+                                          ),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      member,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Row(
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showInviteDialog(context);
+                      },
+                      child: Row(
                         children: [
                           Container(
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              image: widget.groupImage != null
-                                  ? DecorationImage(
-                                      image: NetworkImage(widget.groupImage!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                              color: widget.groupImage == null
-                                  ? Colors.blue.shade100
-                                  : null,
+                              color: Colors.grey[100],
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey[300]!),
                             ),
+                            child: const Icon(Icons.add, color: Colors.grey),
                           ),
                           const SizedBox(width: 12),
-                          Text(widget.groupName),
-                        ],
-                      ),
-                      const Divider(height: 24),
-                      const Text(
-                        '멤버',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Add "Me"
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: const DecorationImage(
-                                  image: NetworkImage(
-                                    'https://picsum.photos/seed/me/200/200',
-                                  ),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                          const Text(
+                            '대화상대 초대',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppTheme.textSecondary,
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '나',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ...widget.members.map((member) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: NetworkImage(
-                                    'https://picsum.photos/seed/${member.hashCode.abs()}/200/200',
-                                  ),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              member,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      )),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'add_member',
-                child: const Text('멤버 초대'),
-                onTap: () {
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    _showToast(context, '멤버 초대 기능');
-                  });
-                },
-              ),
-              PopupMenuItem(
-                value: 'report',
-                child: const Text('신고하기'),
-                onTap: () {
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    _showToast(context, '이 그룹을 신고했습니다');
-                  });
-                },
-              ),
-              PopupMenuItem(
-                value: 'exit',
-                child: const Text('그룹 나가기', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('그룹 나가기'),
-                        content: Text('${widget.groupName} 그룹을 나가시겠습니까?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('취소'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.pop(context, true);
-                              _showToast(context, '그룹에서 나갔습니다');
-                            },
-                            child: const Text('나가기',
-                                style: TextStyle(color: Colors.red)),
                           ),
                         ],
-                      ),
-                    );
-                  });
-                },
-              ),
-            ],
-          ),
-        ],
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // 검색바 (조건부 표시)
-          if (_showSearch)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: '메시지 검색',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      setState(() {
-                        _showSearch = false;
-                        _searchController.clear();
-                        _searchResults = [];
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                onChanged: _searchMessages,
-              ),
-            ),
-          Expanded(
-            child: _searchResults.isNotEmpty
-                ? ListView.builder(
-                    reverse: true,
-                    itemCount: _searchResults.length,
-                    itemBuilder: (context, index) {
-                      final message = _searchResults[index];
-                      return GroupMessageBubble(
-                        message: message.text,
-                        isMe: message.isMe,
-                        time: message.time,
-                        sender: message.sender,
-                      );
-                    },
-                  )
-                : ListView.builder(
-                    reverse: true,
-                    controller: _scrollController,
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      return GroupMessageBubble(
-                        message: message.text,
-                        isMe: message.isMe,
-                        time: message.time,
-                        sender: message.sender,
-                      );
-                    },
-                  ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.attach_file, color: Colors.grey),
-                    onPressed: () {
-                      _showAttachmentMenu(context);
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.camera_alt_outlined, color: Colors.grey),
-                    onPressed: () {
-                      _openCamera(context);
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.auto_awesome, color: Colors.blue),
-                    onPressed: () {
-                      _showAIMenu(context);
-                    },
-                  ),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5), // AppTheme.backgroundColor
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: '메시지를 입력하세요',
-                          filled: false,
-                          fillColor: Colors.transparent,
-                          border: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          disabledBorder: InputBorder.none,
-                          hintStyle: TextStyle(color: Colors.grey),
-                        ),
-                        onSubmitted: _handleSubmitted,
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('사진/동영상'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '사진/동영상 보관함'),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send, color: Colors.blue, size: 24),
-                    onPressed: () => _handleSubmitted(_messageController.text),
+                  ListTile(
+                    leading: const Icon(Icons.folder_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('파일'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '파일 보관함'),
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.link, color: AppTheme.textPrimary),
+                    title: const Text('링크'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () => _showToast(context, '링크 보관함'),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.notifications_off_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('알림 끄기'),
+                    trailing: Switch(value: false, onChanged: (v) {}),
                   ),
                 ],
               ),
             ),
+            Container(
+              color: AppTheme.surfaceColor,
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined,
+                        color: AppTheme.textSecondary),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showSettings(context);
+                    },
+                  ),
+                  IconButton(
+                    icon:
+                        const Icon(Icons.logout, color: AppTheme.textSecondary),
+                    onPressed: () {
+                      Navigator.pop(context); // Close drawer
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('나가기'),
+                          content: const Text('채팅방을 나가시겠습니까?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('취소'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              },
+                              child: const Text('나가기',
+                                  style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              reverse: true,
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return GroupMessageBubble(
+                  message: message.text,
+                  isMe: message.isMe,
+                  time: message.time,
+                  sender: message.sender,
+                );
+              },
+            ),
           ),
+          _buildInputArea(),
         ],
       ),
     );
@@ -607,10 +583,184 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
+  void _showInviteDialog(BuildContext context) {
+    final friends = [
+      {'name': '김철수', 'image': 'https://picsum.photos/id/1011/200/200'},
+      {'name': '이영희', 'image': 'https://picsum.photos/id/1027/200/200'},
+      {'name': '박지성', 'image': 'https://picsum.photos/id/1005/200/200'},
+      {'name': '최민호', 'image': 'https://picsum.photos/id/1012/200/200'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('대화상대 초대'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: friends.length,
+            itemBuilder: (context, index) {
+              final friend = friends[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: NetworkImage(friend['image']!),
+                ),
+                title: Text(friend['name']!),
+                trailing: Checkbox(
+                  value: false,
+                  onChanged: (value) {},
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showToast(context, '초대 메시지를 보냈습니다');
+            },
+            child: const Text('초대'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '채팅방 설정',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              title: const Text('채팅방 이름 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('배경화면 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('알림 설정'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {},
+            ),
+            const Divider(),
+            ListTile(
+              title: const Text('대화 내용 내보내기'),
+              onTap: () {},
+            ),
+            ListTile(
+              title: const Text('대화 내용 모두 삭제'),
+              textColor: Colors.red,
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.attach_file, color: Color(0xFF999999)),
+              onPressed: () {
+                _showAttachmentMenu(context);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.camera_alt_outlined,
+                  color: Color(0xFF999999)),
+              onPressed: () {
+                _openCamera(context);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
+              onPressed: () {
+                _showAIMenu(context);
+              },
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _messageController,
+                  decoration: const InputDecoration(
+                    hintText: '메시지를 입력하세요',
+                    filled: false,
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    hintStyle: TextStyle(color: Color(0xFF999999)),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onSubmitted: _handleSubmitted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.send, color: Color(0xFF0095F6), size: 28),
+              onPressed: () => _handleSubmitted(_messageController.text),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
-    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -647,7 +797,7 @@ class GroupMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -658,6 +808,7 @@ class GroupMessageBubble extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
+                color: Colors.grey[200],
                 shape: BoxShape.circle,
                 image: DecorationImage(
                   image: NetworkImage(
@@ -695,8 +846,8 @@ class GroupMessageBubble extends StatelessWidget {
                       child: Text(
                         '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppTheme.textSecondary,
+                          fontSize: 10,
                         ),
                       ),
                     ),
@@ -706,17 +857,24 @@ class GroupMessageBubble extends StatelessWidget {
                       maxWidth: MediaQuery.of(context).size.width * 0.7,
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isMe ? Colors.blue : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20),
+                      color: isMe
+                          ? const Color(0xFF0095F6)
+                          : const Color(
+                              0xFFF0F0F0), // Solid blue for me, light grey for others
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: Radius.circular(isMe ? 20 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 20),
+                      ),
                     ),
                     child: Text(
                       message,
                       style: TextStyle(
                         color: isMe ? Colors.white : Colors.black,
+                        fontSize: 15,
                       ),
                     ),
                   ),
@@ -726,8 +884,8 @@ class GroupMessageBubble extends StatelessWidget {
                       child: Text(
                         '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                          color: AppTheme.textSecondary,
+                          fontSize: 10,
                         ),
                       ),
                     ),
@@ -736,7 +894,6 @@ class GroupMessageBubble extends StatelessWidget {
               ),
             ],
           ),
-          if (isMe) const SizedBox(width: 24),
         ],
       ),
     );

@@ -1,4 +1,3 @@
-
 // 더보기 및 설정 메뉴 화면
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
@@ -30,9 +29,24 @@ class _MoreScreenState extends State<MoreScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '더보기',
-                style: Theme.of(context).textTheme.displayMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  if (Navigator.canPop(context)) ...[
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new,
+                          color: AppTheme.textPrimary),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    '더보기',
+                    style: Theme.of(context).textTheme.displayMedium,
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               _buildProfileCard(),
@@ -40,8 +54,8 @@ class _MoreScreenState extends State<MoreScreen> {
               Text(
                 '설정',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 16),
               _buildSettingsList(),
@@ -149,7 +163,10 @@ class _MoreScreenState extends State<MoreScreen> {
             icon: Icons.notifications_outlined,
             title: '알림',
             color: Colors.blue,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen())),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const NotificationSettingsScreen())),
           ),
           _buildDivider(),
           _buildSettingItem(
@@ -163,28 +180,36 @@ class _MoreScreenState extends State<MoreScreen> {
             icon: Icons.privacy_tip_outlined,
             title: '개인정보',
             color: Colors.green,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacySettingsScreen())),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const PrivacySettingsScreen())),
           ),
           _buildDivider(),
           _buildSettingItem(
             icon: Icons.security_outlined,
             title: '보안',
             color: Colors.orange,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SecuritySettingsScreen())),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SecuritySettingsScreen())),
           ),
           _buildDivider(),
           _buildSettingItem(
             icon: Icons.help_outline,
             title: '도움말 및 지원',
             color: Colors.purple,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen())),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const HelpScreen())),
           ),
           _buildDivider(),
           _buildSettingItem(
             icon: Icons.info_outline,
             title: '앱 정보',
             color: Colors.grey,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AppInfoScreen())),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AppInfoScreen())),
           ),
         ],
       ),
@@ -215,13 +240,15 @@ class _MoreScreenState extends State<MoreScreen> {
           color: AppTheme.textPrimary,
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.textSecondary),
+      trailing: const Icon(Icons.arrow_forward_ios,
+          size: 14, color: AppTheme.textSecondary),
       onTap: onTap,
     );
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, thickness: 1, color: Colors.grey[100], indent: 60);
+    return Divider(
+        height: 1, thickness: 1, color: Colors.grey[100], indent: 60);
   }
 
   Widget _buildLogoutButton() {
@@ -232,7 +259,8 @@ class _MoreScreenState extends State<MoreScreen> {
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           backgroundColor: AppTheme.errorColor.withOpacity(0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: const Text(
           '로그아웃',
@@ -267,7 +295,8 @@ class _MoreScreenState extends State<MoreScreen> {
                 (route) => false,
               );
             },
-            child: const Text('로그아웃', style: TextStyle(color: AppTheme.errorColor)),
+            child: const Text('로그아웃',
+                style: TextStyle(color: AppTheme.errorColor)),
           ),
         ],
       ),
@@ -280,7 +309,8 @@ class _MoreScreenState extends State<MoreScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('차단된 사용자'),
           content: SizedBox(
             width: double.maxFinite,
