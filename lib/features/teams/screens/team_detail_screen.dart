@@ -26,7 +26,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   late List<String> _members;
   late TextEditingController _teamNameController;
   late TextEditingController _noticeController;
-  Map<String, String> _memberNicknames = {};
+  final Map<String, String> _memberNicknames = {};
   late String _teamName;
 
   @override
@@ -171,7 +171,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                       image: DecorationImage(
                         image: NetworkImage(
-                          widget.teamImage ?? 'https://picsum.photos/seed/$_teamName/200/200',
+                          widget.teamImage ??
+                              'https://picsum.photos/seed/$_teamName/200/200',
                         ),
                         fit: BoxFit.cover,
                       ),

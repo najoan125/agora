@@ -112,9 +112,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = _dataManager.currentUser;
-    final allMembers = [currentUser['name'], ...widget.members];
-
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,

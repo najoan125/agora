@@ -18,7 +18,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _teamDescriptionController;
   String _selectedImage = 'https://picsum.photos/id/1005/200/200';
-  List<Map<String, dynamic>> _selectedMembers = [];
+  final List<Map<String, dynamic>> _selectedMembers = [];
 
   final List<String> _availableImages = [
     'https://picsum.photos/id/1005/200/200',
@@ -104,7 +104,8 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
                       width: double.maxFinite,
                       child: GridView.builder(
                         shrinkWrap: true,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
@@ -251,7 +252,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // 선택된 팀원 표시
             if (_selectedMembers.isNotEmpty) ...[
               Text(
@@ -328,7 +329,8 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
                           builder: (context) => AddTeamMemberScreen(
                             onMemberAdded: (member) {
                               setState(() {
-                                if (!_selectedMembers.any((m) => m['id'] == member['id'])) {
+                                if (!_selectedMembers
+                                    .any((m) => m['id'] == member['id'])) {
                                   _selectedMembers.add(member);
                                 }
                               });

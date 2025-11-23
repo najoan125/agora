@@ -9,9 +9,7 @@ import '../profile/screens/profile_screen.dart';
 import '../friends/screens/add_friend_screen.dart';
 import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
-import '../teams/screens/calendar_screen.dart';
-import '../teams/screens/todo_screen.dart';
-import '../teams/screens/org_chart_screen.dart';
+
 import '../teams/screens/notice_screen.dart';
 import '../chat/screens/create_group_screen.dart';
 import '../chat/screens/group_chat_screen.dart';
@@ -911,12 +909,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showFeatureNotReady(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature 기능은 준비 중입니다.')),
-    );
-  }
-
   Widget _buildTeamTile(Map<String, dynamic> team) {
     return Container(
       decoration: const BoxDecoration(
@@ -984,54 +976,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         builder: (context) => ProfileScreen(
           user: friend,
         ),
-      ),
-    );
-  }
-
-  Widget _buildGroupChatWideTile(Map<String, String?> chat) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0E0E0),
-              borderRadius: BorderRadius.circular(16),
-              image: chat['image'] != null
-                  ? DecorationImage(
-                      image: NetworkImage(chat['image']!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chat['name'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  chat['info'] ?? '추가정보',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

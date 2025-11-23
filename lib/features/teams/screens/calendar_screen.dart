@@ -29,7 +29,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<Map<String, String>> _getEventsForDay(DateTime day) {
     // Normalize date to ignore time for key matching
-    final normalizedDay = DateTime(day.year, day.month, day.day);
+
     // Simple check for mock data - in real app, use proper date comparison
     final key = _events.keys.firstWhere(
       (k) => k.year == day.year && k.month == day.month && k.day == day.day,
@@ -51,7 +51,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         title: const Text(
           '일정',
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
@@ -110,7 +111,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Widget _buildCalendarGrid() {
-    final daysInMonth = DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
+    final daysInMonth =
+        DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
     final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
     final weekdayOffset = firstDayOfMonth.weekday % 7;
 
@@ -121,7 +123,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: ['일', '월', '화', '수', '목', '금', '토']
-                .map((day) => Text(day, style: const TextStyle(color: Colors.grey)))
+                .map((day) =>
+                    Text(day, style: const TextStyle(color: Colors.grey)))
                 .toList(),
           ),
           const SizedBox(height: 8),
@@ -136,11 +139,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             itemCount: daysInMonth + weekdayOffset,
             itemBuilder: (context, index) {
               if (index < weekdayOffset) return const SizedBox();
-              
+
               final day = index - weekdayOffset + 1;
               final date = DateTime(_focusedDay.year, _focusedDay.month, day);
               final isToday = DateUtils.isSameDay(date, DateTime.now());
-              final isSelected = _selectedDay != null && DateUtils.isSameDay(date, _selectedDay);
+              final isSelected = _selectedDay != null &&
+                  DateUtils.isSameDay(date, _selectedDay);
               final hasEvents = _getEventsForDay(date).isNotEmpty;
 
               return GestureDetector(
@@ -151,7 +155,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.primaryColor : (isToday ? AppTheme.primaryColor.withOpacity(0.1) : null),
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : (isToday
+                            ? AppTheme.primaryColor.withOpacity(0.1)
+                            : null),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -161,8 +169,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         Text(
                           '$day',
                           style: TextStyle(
-                            color: isSelected ? Colors.white : (isToday ? AppTheme.primaryColor : Colors.black),
-                            fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.white
+                                : (isToday
+                                    ? AppTheme.primaryColor
+                                    : Colors.black),
+                            fontWeight: isSelected || isToday
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                         if (hasEvents)
@@ -189,7 +203,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildEventList() {
     final events = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
-    
+
     if (_selectedDay == null) {
       return const Center(child: Text('날짜를 선택하여 일정을 확인하세요.'));
     }
@@ -205,10 +219,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final event = events[index];
         Color eventColor;
         switch (event['type']) {
-          case 'meeting': eventColor = Colors.blue; break;
-          case 'deadline': eventColor = Colors.red; break;
-          case 'work': eventColor = Colors.green; break;
-          default: eventColor = Colors.orange;
+          case 'meeting':
+            eventColor = Colors.blue;
+            break;
+          case 'deadline':
+            eventColor = Colors.red;
+            break;
+          case 'work':
+            eventColor = Colors.green;
+            break;
+          default:
+            eventColor = Colors.orange;
         }
 
         return Container(
