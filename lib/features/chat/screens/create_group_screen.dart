@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agora/core/theme.dart';
-import 'package:agora/features/chat/screens/create_group_chat_screen.dart';
+import 'package:agora/features/chat/screens/select_members_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -23,7 +23,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const CreateGroupChatScreen(),
+        builder: (context) => const SelectMembersScreen(),
       ),
     );
 

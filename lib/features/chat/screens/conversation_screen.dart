@@ -1,6 +1,7 @@
 // 개별 1:1 채팅 대화 화면
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
+import 'invite_user_screen.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String userName;
@@ -21,8 +22,11 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
+  bool _showSearch = false;
+  List<ChatMessage> _searchResults = [];
 
   @override
   void initState() {
@@ -77,6 +81,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
     });
   }
 
+  void _searchMessages(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _searchResults = [];
+      } else {
+        _searchResults = _messages
+            .where(
+                (msg) => msg.text.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,17 +114,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
               height: 36,
               decoration: BoxDecoration(
                 color: widget.isTeam ? Colors.blue[50] : Colors.grey[200],
-                borderRadius: BorderRadius.circular(12),
-                image: widget.userImage.isNotEmpty &&
-                        widget.userImage.startsWith('http')
+                shape: BoxShape.circle,
+                image: widget.userImage.isNotEmpty
                     ? DecorationImage(
                         image: NetworkImage(widget.userImage),
                         fit: BoxFit.cover,
                       )
                     : null,
               ),
-              child: widget.userImage.isEmpty ||
-                      !widget.userImage.startsWith('http')
+              child: widget.userImage.isEmpty
                   ? Center(
                       child: Text(
                         widget.isTeam ? '👥' : '👤',
@@ -144,7 +159,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black),
             onPressed: () {
-              // 검색 기능 구현
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchController.clear();
+                  _searchResults = [];
+                }
+              });
             },
           ),
           IconButton(
@@ -173,89 +194,113 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           ),
                     ),
                     const SizedBox(height: 20),
-                    // Current User (Me)
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                            image: const DecorationImage(
-                              image: NetworkImage(
-                                  'https://picsum.photos/id/1005/200/200'), // My image
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          '나',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Other User
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                            image: widget.userImage.isNotEmpty &&
-                                    widget.userImage.startsWith('http')
-                                ? DecorationImage(
-                                    image: NetworkImage(widget.userImage),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          child: widget.userImage.isEmpty ||
-                                  !widget.userImage.startsWith('http')
-                              ? const Icon(Icons.person, color: Colors.grey)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          widget.userName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showInviteDialog(context);
-                      },
-                      child: Row(
+                    // Horizontal Member List
+                    SizedBox(
+                      height: 90,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey[300]!),
+                          // Current User (Me)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    shape: BoxShape.circle,
+                                    image: const DecorationImage(
+                                      image: NetworkImage(
+                                          'https://picsum.photos/id/1005/200/200'), // My image
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  '나',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.add, color: Colors.grey),
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            '대화상대 초대',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppTheme.textSecondary,
+                          // Other User
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    shape: BoxShape.circle,
+                                    image: widget.userImage.isNotEmpty
+                                        ? DecorationImage(
+                                            image: NetworkImage(widget.userImage),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                  ),
+                                  child: widget.userImage.isEmpty
+                                      ? const Icon(Icons.person,
+                                          color: Colors.grey)
+                                      : null,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  widget.userName,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Invite Button
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const InviteUserScreen(),
+                                  ),
+                                );
+                              },
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      shape: BoxShape.circle,
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: const Icon(Icons.add,
+                                        color: Colors.grey),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    '초대',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -354,23 +399,66 @@ class _ConversationScreenState extends State<ConversationScreen> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              reverse: true,
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return MessageBubble(
-                  message: message.text,
-                  isMe: message.isMe,
-                  time: message.time,
-                  userImage: widget.userImage,
-                  senderName: widget.userName,
-                );
-              },
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: '메시지 검색',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _showSearch = false;
+                        _searchController.clear();
+                        _searchResults = [];
+                      });
+                    },
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                onChanged: _searchMessages,
+              ),
             ),
+          Expanded(
+            child: _searchResults.isNotEmpty
+                ? ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 20),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final message = _searchResults[index];
+                      return MessageBubble(
+                        message: message.text,
+                        isMe: message.isMe,
+                        time: message.time,
+                        userImage: widget.userImage,
+                        senderName: widget.userName,
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    reverse: true,
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 20),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return MessageBubble(
+                        message: message.text,
+                        isMe: message.isMe,
+                        time: message.time,
+                        userImage: widget.userImage,
+                        senderName: widget.userName,
+                      );
+                    },
+                  ),
           ),
           _buildInputArea(),
         ],
@@ -529,55 +617,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(bottom: 100, left: 16, right: 16),
-      ),
-    );
-  }
-
-  void _showInviteDialog(BuildContext context) {
-    final friends = [
-      {'name': '김철수', 'image': 'https://picsum.photos/id/1011/200/200'},
-      {'name': '이영희', 'image': 'https://picsum.photos/id/1027/200/200'},
-      {'name': '박지성', 'image': 'https://picsum.photos/id/1005/200/200'},
-      {'name': '최민호', 'image': 'https://picsum.photos/id/1012/200/200'},
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('대화상대 초대'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: friends.length,
-            itemBuilder: (context, index) {
-              final friend = friends[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(friend['image']!),
-                ),
-                title: Text(friend['name']!),
-                trailing: Checkbox(
-                  value: false,
-                  onChanged: (value) {},
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showToast(context, '초대 메시지를 보냈습니다');
-            },
-            child: const Text('초대'),
-          ),
-        ],
       ),
     );
   }

@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:agora/core/theme.dart';
 import 'package:agora/data/data_manager.dart';
 
-class CreateGroupChatScreen extends StatefulWidget {
-  const CreateGroupChatScreen({super.key});
+class SelectMembersScreen extends StatefulWidget {
+  const SelectMembersScreen({super.key});
 
   @override
-  State<CreateGroupChatScreen> createState() => _CreateGroupChatScreenState();
+  State<SelectMembersScreen> createState() => _SelectMembersScreenState();
 }
 
-class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
+class _SelectMembersScreenState extends State<SelectMembersScreen> {
   final DataManager _dataManager = DataManager();
   final Set<String> _selectedFriendIds = {};
   String _searchQuery = '';

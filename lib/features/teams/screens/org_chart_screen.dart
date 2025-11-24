@@ -1,125 +1,238 @@
 import 'package:flutter/material.dart';
-import 'package:agora/core/theme.dart';
+import '../../../data/data_manager.dart';
 
-class OrgChartScreen extends StatelessWidget {
-  const OrgChartScreen({super.key});
+class OrgChartScreen extends StatefulWidget {
+  final String teamName;
+
+  const OrgChartScreen({
+    Key? key,
+    required this.teamName,
+  }) : super(key: key);
+
+  @override
+  State<OrgChartScreen> createState() => _OrgChartScreenState();
+}
+
+class _OrgChartScreenState extends State<OrgChartScreen> {
+  List<Map<String, dynamic>> _sortedRoles = [];
+  Map<String, List<String>> _membersByRole = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrgData();
+  }
+
+  void _loadOrgData() {
+    final roleDefinitions = DataManager().getRoleDefinitions(widget.teamName);
+    final members = DataManager().teams.firstWhere((t) => t['name'] == widget.teamName)['members'] as List<dynamic>;
+    
+    // Sort roles by permission count (descending) as a proxy for authority
+    // In a real app, you might have an explicit 'level' field
+    _sortedRoles = List<Map<String, dynamic>>.from(roleDefinitions);
+    _sortedRoles.sort((a, b) {
+      final permsA = (a['permissions'] as List).length;
+      final permsB = (b['permissions'] as List).length;
+      return permsB.compareTo(permsA); // Descending
+    });
+
+    // Group members
+    _membersByRole = {};
+    for (var role in _sortedRoles) {
+      _membersByRole[role['id']] = [];
+    }
+
+    for (var member in members) {
+      final roleId = DataManager().getTeamRole(widget.teamName, member as String);
+      if (_membersByRole.containsKey(roleId)) {
+        _membersByRole[roleId]!.add(member);
+      } else {
+         // Fallback
+         if (_sortedRoles.isNotEmpty) {
+           final lastRole = _sortedRoles.last['id'];
+           if (_membersByRole.containsKey(lastRole)) {
+             _membersByRole[lastRole]!.add(member);
+           }
+         }
+      }
+    }
+
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
+        title: const Text('조직도'),
         backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          '조직도',
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            _buildOrgNode('CEO', '김대표', 'https://picsum.photos/id/1005/200/200', isRoot: true),
-            _buildConnector(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    _buildOrgNode('CTO', '이기술', 'https://picsum.photos/id/1012/200/200'),
-                    _buildConnector(),
-                    _buildOrgNode('개발팀장', '박팀장', 'https://picsum.photos/id/1025/200/200'),
-                    _buildConnector(),
-                    Row(
+      body: _sortedRoles.isEmpty
+          ? const Center(child: Text('직급 정보가 없습니다.'))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Title / Header
+                  Center(
+                    child: Column(
                       children: [
-                        _buildOrgNode('팀원', '김철수', null, isSmall: true),
-                        const SizedBox(width: 8),
-                        _buildOrgNode('팀원', '이영희', null, isSmall: true),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.apartment,
+                            size: 40,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.teamName,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '전체 조직 구성원',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
                       ],
-                    )
-                  ],
-                ),
-                Column(
-                  children: [
-                    _buildOrgNode('CPO', '최기획', 'https://picsum.photos/id/1027/200/200'),
-                    _buildConnector(),
-                    _buildOrgNode('기획팀장', '정팀장', 'https://picsum.photos/id/1035/200/200'),
-                    _buildConnector(),
-                    _buildOrgNode('팀원', '홍길동', null, isSmall: true),
-                  ],
-                ),
-              ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  
+                  // Tree Visualization
+                  ..._sortedRoles.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final role = entry.value;
+                    final members = _membersByRole[role['id']] ?? [];
+                    final isLast = index == _sortedRoles.length - 1;
+
+                    return _buildOrgNode(
+                      roleName: role['name'],
+                      members: members,
+                      isLast: isLast,
+                      level: index,
+                    );
+                  }).toList(),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildOrgNode(String role, String name, String? image, {bool isRoot = false, bool isSmall = false}) {
-    return Container(
-      padding: EdgeInsets.all(isSmall ? 8 : 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isRoot ? AppTheme.primaryColor : const Color(0xFFE0E0E0), width: isRoot ? 2 : 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: isSmall ? 40 : 60,
-            height: isSmall ? 40 : 60,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey[200],
-              image: image != null
-                  ? DecorationImage(image: NetworkImage(image), fit: BoxFit.cover)
-                  : null,
+  Widget _buildOrgNode({
+    required String roleName,
+    required List<String> members,
+    required bool isLast,
+    required int level,
+  }) {
+    return Column(
+      children: [
+        // Node Card
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: level == 0 ? Colors.blue.shade200 : Colors.grey.shade200,
+              width: level == 0 ? 2 : 1,
             ),
-            child: image == null
-                ? Center(child: Text(name[0], style: TextStyle(fontSize: isSmall ? 16 : 24)))
-                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          SizedBox(height: isSmall ? 4 : 8),
+          child: Column(
+            children: [
+              Text(
+                roleName,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: level == 0 ? Colors.blue.shade700 : Colors.black87,
+                ),
+              ),
+              if (members.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: members.map((member) => _buildMemberChip(member)).toList(),
+                ),
+              ] else ...[
+                 const SizedBox(height: 8),
+                 Text(
+                   '(공석)',
+                   style: TextStyle(
+                     fontSize: 12,
+                     color: Colors.grey.shade400,
+                   ),
+                 ),
+              ],
+            ],
+          ),
+        ),
+        
+        // Connector Line
+        if (!isLast)
+          Container(
+            width: 2,
+            height: 30,
+            color: Colors.grey.shade300,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMemberChip(String name) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 8,
+            backgroundImage: NetworkImage(DataManager().getMemberImage(name)),
+          ),
+          const SizedBox(width: 6),
           Text(
             name,
-            style: TextStyle(
-              fontSize: isSmall ? 12 : 16,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          Text(
-            role,
-            style: TextStyle(
-              fontSize: isSmall ? 10 : 13,
-              color: AppTheme.textSecondary,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildConnector() {
-    return Container(
-      width: 2,
-      height: 20,
-      color: const Color(0xFFE0E0E0),
     );
   }
 }

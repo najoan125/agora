@@ -8,6 +8,7 @@ class CollapsibleSection extends StatefulWidget {
   final Widget? minimizedChild;
   final Widget child;
   final bool isInitiallyExpanded;
+  final VoidCallback? onAdd;
 
   const CollapsibleSection({
     Key? key,
@@ -16,6 +17,7 @@ class CollapsibleSection extends StatefulWidget {
     required this.child,
     this.minimizedChild,
     this.isInitiallyExpanded = true,
+    this.onAdd,
   }) : super(key: key);
 
   @override
@@ -35,7 +37,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Divider(height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
+        const Divider(height: 1, thickness: 1, color: Color(0xFFE0E0E0)),
         InkWell(
           onTap: () {
             setState(() {
@@ -64,6 +66,17 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                   ),
                 ),
                 const Spacer(),
+                if (widget.onAdd != null)
+                  GestureDetector(
+                    onTap: widget.onAdd,
+                    child: const Padding(
+                      padding: EdgeInsets.only(right: 8.0),
+                      child: Icon(
+                        Icons.add,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
                 Icon(
                   _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                   color: AppTheme.textSecondary,

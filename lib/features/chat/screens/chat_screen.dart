@@ -6,6 +6,8 @@ import '../widgets/chat_tile.dart';
 import 'conversation_screen.dart';
 import 'team_chat_screen.dart';
 
+import 'create_chat_folder_screen.dart';
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
 
@@ -22,11 +24,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isMenuOpen = false;
   bool _isSearching = false;
   bool _showUnreadOnly = false;
+  
+  // Custom Chat Folders
+  final List<Map<String, dynamic>> _friendChatFolders = [];
+  final List<Map<String, dynamic>> _teamChatFolders = [];
+  Map<String, dynamic>? _selectedFolder;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          // Reset selected folder when switching tabs
+          _selectedFolder = null;
+          _showUnreadOnly = false;
+        });
+      }
+    });
     _menuAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -62,15 +78,30 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
+  int get _totalUnreadCount {
+    return _dataManager.chats.fold(0, (sum, chat) => sum + (chat['unread'] as int? ?? 0));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isTeamTab = _tabController.index == 1;
+    final currentFolders = isTeamTab ? _teamChatFolders : _friendChatFolders;
+
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: AppTheme.backgroundColor,
+          backgroundColor: Colors.white,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
+            title: const Text(
+              '채팅',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.search, size: 28, color: Colors.black),
@@ -86,18 +117,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 16),
             ],
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: AppTheme.textPrimary,
-              unselectedLabelColor: AppTheme.textSecondary,
-              indicatorColor: AppTheme.textPrimary,
-              indicatorWeight: 2,
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-              tabs: const [
-                Tab(text: '친구'),
-                Tab(text: '팀원'),
-              ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(48),
+              child: Container(
+                color: Colors.white,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: Colors.black,
+                  unselectedLabelColor: const Color(0xFF8E8E93),
+                  indicatorColor: Colors.black,
+                  indicatorWeight: 1.0,
+                  labelPadding: EdgeInsets.zero,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  tabs: [
+                    _buildTab('친구', 0),
+                    _buildTab('팀원', 1),
+                  ],
+                ),
+              ),
             ),
           ),
           body: GestureDetector(
@@ -109,6 +146,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             },
             behavior: HitTestBehavior.translucent,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_isSearching)
                   Container(
@@ -168,6 +206,100 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+                
+                // Filter Row (All / Unread / Custom Folders)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip(
+                          label: '전체',
+                          isSelected: !_showUnreadOnly && _selectedFolder == null,
+                          onTap: () {
+                            setState(() {
+                              _showUnreadOnly = false;
+                              _selectedFolder = null;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFilterChip(
+                          label: '안읽음',
+                          isSelected: _showUnreadOnly,
+                          count: _totalUnreadCount,
+                          onTap: () {
+                            setState(() {
+                              _showUnreadOnly = true;
+                              _selectedFolder = null;
+                            });
+                          },
+                          isUnreadFilter: true,
+                        ),
+                        const SizedBox(width: 8),
+                        
+                        // Custom Folder Chips
+                        ...currentFolders.map((folder) {
+                          final folderName = folder['name'] as String;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildFilterChip(
+                              label: folderName,
+                              isSelected: _selectedFolder == folder,
+                              onTap: () {
+                                setState(() {
+                                  if (_selectedFolder == folder) {
+                                    _selectedFolder = null; // Toggle off
+                                  } else {
+                                    _selectedFolder = folder;
+                                    _showUnreadOnly = false; // Disable unread filter
+                                  }
+                                });
+                              },
+                              onDelete: () {
+                                setState(() {
+                                  currentFolders.remove(folder);
+                                  if (_selectedFolder == folder) {
+                                    _selectedFolder = null;
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        }).toList(),
+
+                        // Add button
+                        GestureDetector(
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CreateChatFolderScreen(isTeam: isTeamTab),
+                              ),
+                            );
+                            
+                            if (result != null && result is Map<String, dynamic>) {
+                              setState(() {
+                                currentFolders.add(result);
+                              });
+                            }
+                          },
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: const Icon(Icons.add, size: 20, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -179,13 +311,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              // Start new chat
-            },
-            backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.edit, color: Colors.white),
           ),
         ),
         if (_isMenuOpen)
@@ -215,31 +340,108 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildMenuItem(
-                      '안읽은 메시지 확인',
-                      Icons.mark_email_unread_outlined,
-                      () {
-                        _toggleMenu();
-                        setState(() {
-                          _showUnreadOnly = !_showUnreadOnly;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(_showUnreadOnly
-                                ? '안읽은 메시지만 표시합니다'
-                                : '모든 메시지를 표시합니다'),
-                            duration: const Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      isSelected: _showUnreadOnly,
-                    ),
+                      _buildMenuItem(
+                        '메시지 수신 시뮬레이션',
+                        Icons.send_to_mobile,
+                        () {
+                          _toggleMenu();
+                          _dataManager.receiveMockMessage();
+                          setState(() {}); // Refresh UI
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('새로운 메시지가 도착했습니다'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildTab(String text, int index) {
+    // Check if this tab is selected
+    final bool isSelected = _tabController.index == index;
+    return Tab(
+      height: 48,
+      child: Container(
+        color: isSelected ? const Color(0xFFEBF5FF) : Colors.white, // Light blue for selected
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    int? count,
+    bool isUnreadFilter = false,
+    VoidCallback? onDelete,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1A1A1A) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1A1A1A) : Colors.grey[300]!,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF5A00), // Orange badge
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            if (onDelete != null && isSelected) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onDelete,
+                child: const Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -265,10 +467,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            if (isSelected) ...[
-              const Spacer(),
-              const Icon(Icons.check, size: 16, color: AppTheme.primaryColor),
-            ],
           ],
         ),
       ),
@@ -276,32 +474,45 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildChatList({required bool isTeam}) {
-    final chats = _dataManager.chats.where((chat) {
+    var chats = _dataManager.chats.where((chat) {
       final bool chatIsTeam = chat['isTeam'] ?? false;
       return chatIsTeam == isTeam;
     }).toList();
 
-    var filteredChats = _searchQuery.isEmpty
-        ? chats
-        : chats.where((chat) =>
-            chat['name'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            chat['message'].toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-    if (_showUnreadOnly) {
-      filteredChats = filteredChats.where((chat) => (chat['unread'] ?? 0) > 0).toList();
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      chats = chats.where((chat) =>
+          chat['name'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          chat['message'].toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     }
 
-    if (filteredChats.isEmpty) {
+    // Filter by unread
+    if (_showUnreadOnly) {
+      chats = chats.where((chat) => (chat['unread'] ?? 0) > 0).toList();
+    }
+    
+    // Filter by selected folder
+    if (_selectedFolder != null) {
+      final members = List<String>.from(_selectedFolder!['members'] ?? []);
+      chats = chats.where((chat) => members.contains(chat['name'])).toList();
+    }
+
+    if (chats.isEmpty) {
       return _buildEmptyState();
     }
 
     return ListView.builder(
-      itemCount: filteredChats.length,
+      itemCount: chats.length,
       itemBuilder: (context, index) {
-        final chat = filteredChats[index];
+        final chat = chats[index];
         return ChatTile(
           chat: chat,
           onTap: () {
+            // Clear unread count
+            setState(() {
+              _dataManager.clearUnread(chat['id']);
+            });
+
             if (chat['isTeam'] == true) {
               // Find team data to get members
               final team = _dataManager.teams.firstWhere(
@@ -319,7 +530,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     members: List<String>.from(team['members'] ?? []),
                   ),
                 ),
-              );
+              ).then((_) => setState(() {})); // Refresh on return
             } else {
               Navigator.push(
                 context,
@@ -330,7 +541,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     isTeam: false,
                   ),
                 ),
-              );
+              ).then((_) => setState(() {})); // Refresh on return
             }
           },
         );
@@ -339,6 +550,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildEmptyState() {
+    String message = '대화가 없습니다';
+    if (_showUnreadOnly) message = '안읽은 메시지가 없습니다';
+    if (_selectedFolder != null) message = '${_selectedFolder!['name']} 폴더에 대화가 없습니다';
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -346,14 +561,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           Icon(Icons.chat_bubble_outline, size: 64, color: AppTheme.textTertiary),
           const SizedBox(height: 16),
           Text(
-            '대화가 없습니다',
+            message,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '새로운 대화를 시작해보세요',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          if (!_showUnreadOnly && _selectedFolder == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                '새로운 대화를 시작해보세요',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
         ],
       ),
     );

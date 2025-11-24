@@ -22,7 +22,6 @@ class GroupChatTile extends StatelessWidget {
         cursor: SystemMouseCursors.click,
         child: Container(
           width: 64,
-          margin: const EdgeInsets.only(right: 16),
           child: Column(
             children: [
               Container(

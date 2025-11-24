@@ -1,6 +1,7 @@
 // 그룹 채팅 대화 화면
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
+import 'invite_user_screen.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupName;
@@ -21,8 +22,11 @@ class GroupChatScreen extends StatefulWidget {
 class _GroupChatScreenState extends State<GroupChatScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
+  bool _showSearch = false;
+  List<ChatMessage> _searchResults = [];
 
   @override
   void initState() {
@@ -103,6 +107,19 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  void _searchMessages(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _searchResults = [];
+      } else {
+        _searchResults = _messages
+            .where(
+                (msg) => msg.text.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,7 +157,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black),
             onPressed: () {
-              // 검색 기능 구현
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchController.clear();
+                  _searchResults = [];
+                }
+              });
             },
           ),
           IconButton(
@@ -214,23 +237,24 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    // Member List
+                    // Horizontal Member List
                     SizedBox(
-                      height: 150, // Limit height for member list
+                      height: 90,
                       child: ListView(
+                        scrollDirection: Axis.horizontal,
                         padding: EdgeInsets.zero,
                         children: [
                           // Me
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Column(
                               children: [
                                 Container(
-                                  width: 40,
-                                  height: 40,
+                                  width: 50,
+                                  height: 50,
                                   decoration: BoxDecoration(
                                     color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(12),
+                                    shape: BoxShape.circle,
                                     image: const DecorationImage(
                                       image: NetworkImage(
                                           'https://picsum.photos/id/1005/200/200'), // My image
@@ -238,12 +262,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(height: 8),
                                 const Text(
                                   '나',
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
@@ -251,16 +275,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                           ),
                           // Other Members
                           ...widget.members.map((member) => Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Row(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: Column(
                                   children: [
                                     Container(
-                                      width: 40,
-                                      height: 40,
+                                      width: 50,
+                                      height: 50,
                                       decoration: BoxDecoration(
                                         color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(12),
+                                        shape: BoxShape.circle,
                                         image: DecorationImage(
                                           image: NetworkImage(
                                             'https://picsum.photos/seed/${member.hashCode}/200/200',
@@ -269,44 +292,55 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(height: 8),
                                     Text(
                                       member,
                                       style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ],
                                 ),
                               )),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showInviteDialog(context);
-                      },
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: const Icon(Icons.add, color: Colors.grey),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            '대화상대 초대',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppTheme.textSecondary,
+                          // Invite Button
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const InviteUserScreen(),
+                                  ),
+                                );
+                              },
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      shape: BoxShape.circle,
+                                      border:
+                                          Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: const Icon(Icons.add,
+                                        color: Colors.grey),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    '초대',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -405,22 +439,64 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              reverse: true,
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return GroupMessageBubble(
-                  message: message.text,
-                  isMe: message.isMe,
-                  time: message.time,
-                  sender: message.sender,
-                );
-              },
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: '메시지 검색',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _showSearch = false;
+                        _searchController.clear();
+                        _searchResults = [];
+                      });
+                    },
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                onChanged: _searchMessages,
+              ),
             ),
+          Expanded(
+            child: _searchResults.isNotEmpty
+                ? ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 20),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final message = _searchResults[index];
+                      return GroupMessageBubble(
+                        message: message.text,
+                        isMe: message.isMe,
+                        time: message.time,
+                        sender: message.sender,
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    reverse: true,
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 20),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return GroupMessageBubble(
+                        message: message.text,
+                        isMe: message.isMe,
+                        time: message.time,
+                        sender: message.sender,
+                      );
+                    },
+                  ),
           ),
           _buildInputArea(),
         ],
@@ -583,54 +659,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-  void _showInviteDialog(BuildContext context) {
-    final friends = [
-      {'name': '김철수', 'image': 'https://picsum.photos/id/1011/200/200'},
-      {'name': '이영희', 'image': 'https://picsum.photos/id/1027/200/200'},
-      {'name': '박지성', 'image': 'https://picsum.photos/id/1005/200/200'},
-      {'name': '최민호', 'image': 'https://picsum.photos/id/1012/200/200'},
-    ];
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('대화상대 초대'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: friends.length,
-            itemBuilder: (context, index) {
-              final friend = friends[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(friend['image']!),
-                ),
-                title: Text(friend['name']!),
-                trailing: Checkbox(
-                  value: false,
-                  onChanged: (value) {},
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showToast(context, '초대 메시지를 보냈습니다');
-            },
-            child: const Text('초대'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showSettings(BuildContext context) {
     showModalBottomSheet(
@@ -761,6 +790,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }

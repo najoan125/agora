@@ -56,12 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 });
               },
             ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: AppTheme.textPrimary),
-            onPressed: () {
-              // 더 많은 옵션
-            },
-          ),
+
         ],
       ),
       body: SingleChildScrollView(

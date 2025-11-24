@@ -247,7 +247,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                                   height: 50,
                                   decoration: BoxDecoration(
                                     color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(16),
+                                    shape: BoxShape.circle,
                                     image: DecorationImage(
                                       image: NetworkImage(
                                           _dataManager.currentUser['image']),
@@ -271,15 +271,15 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                                 padding: const EdgeInsets.only(right: 16),
                                 child: Column(
                                   children: [
-                                    Container(
+                                      Container(
                                       width: 50,
                                       height: 50,
                                       decoration: BoxDecoration(
                                         color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(16),
+                                        shape: BoxShape.circle,
                                         image: DecorationImage(
                                           image: NetworkImage(
-                                            'https://picsum.photos/seed/${member.hashCode}/200/200',
+                                            _dataManager.getMemberImage(member),
                                           ),
                                           fit: BoxFit.cover,
                                         ),

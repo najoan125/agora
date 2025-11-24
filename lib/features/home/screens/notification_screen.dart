@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:agora/core/theme.dart';
 
-class NoticeScreen extends StatelessWidget {
-  const NoticeScreen({super.key});
+class NotificationScreen extends StatelessWidget {
+  const NotificationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +44,7 @@ class NoticeScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          '공지사항',
+          '알림',
           style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
