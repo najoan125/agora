@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/theme.dart';
+import '../../data/auth_service.dart';
 import 'login_screen.dart';
 import '../settings/screens/policy_screen.dart' show termsOfServiceContent, privacyPolicyContent, PolicyScreen;
 
@@ -17,6 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   late TextEditingController _confirmPasswordController;
+  final _authService = AuthService();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
@@ -40,7 +42,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _signup() {
+  Future<void> _signup() async {
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
@@ -69,19 +71,36 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    final result = await _authService.register(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      username: _nameController.text.trim(),
+    );
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('계정이 성공적으로 생성되었습니다!')),
+          const SnackBar(
+            content: Text('계정이 성공적으로 생성되었습니다!'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
+    }
   }
 
   @override

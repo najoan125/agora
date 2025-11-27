@@ -1,7 +1,15 @@
-// 개별 1:1 채팅 대화 화면
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import 'invite_user_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:async';
+import '../../../core/utils/file_download_helper.dart';
+import '../widgets/voice_recorder_dialog.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String userName;
@@ -27,10 +35,55 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showSearch = false;
   List<ChatMessage> _searchResults = [];
+  XFile? _selectedImage;
+  PlatformFile? _selectedFile;
+  String? _selectedVoiceMemo;
+  int _voiceMemoDuration = 0;
+  
+  // 음성 메모 미리보기 재생용
+  final AudioPlayer _previewAudioPlayer = AudioPlayer();
+  bool _isPreviewPlaying = false;
+  Duration _previewCurrentPosition = Duration.zero;
+  Duration _previewTotalDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    
+    // 미리보기 오디오 플레이어 리스너 설정
+    _previewAudioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPreviewPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+
+    _previewAudioPlayer.onDurationChanged.listen((duration) {
+      if (mounted) {
+        setState(() {
+          _previewTotalDuration = duration;
+        });
+      }
+    });
+
+    _previewAudioPlayer.onPositionChanged.listen((position) {
+      if (mounted) {
+        setState(() {
+          _previewCurrentPosition = position;
+        });
+      }
+    });
+
+    _previewAudioPlayer.onPlayerComplete.listen((event) {
+      if (mounted) {
+        setState(() {
+          _isPreviewPlaying = false;
+          _previewCurrentPosition = Duration.zero;
+        });
+      }
+    });
+    
     // Dummy messages
     _messages.addAll([
       ChatMessage(
@@ -51,18 +104,53 @@ class _ConversationScreenState extends State<ConversationScreen> {
     ]);
   }
 
-  void _handleSubmitted(String text) {
-    if (text.trim().isEmpty) return;
+  @override
+  void dispose() {
+    _previewAudioPlayer.dispose();
+    _messageController.dispose();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleSubmitted(String text) async {
+    if (text.trim().isEmpty && _selectedImage == null && _selectedFile == null && _selectedVoiceMemo == null) return;
+
+    Uint8List? imageBytes;
+    if (_selectedImage != null) {
+      imageBytes = await _selectedImage!.readAsBytes();
+    }
+
+    Uint8List? fileBytes;
+    if (_selectedFile != null) {
+      if (_selectedFile!.bytes != null) {
+        fileBytes = _selectedFile!.bytes;
+      } else if (_selectedFile!.path != null) {
+        fileBytes = await File(_selectedFile!.path!).readAsBytes();
+      }
+    }
 
     _messageController.clear();
     setState(() {
+      print('📤 Sending voice memo: duration=${_voiceMemoDuration}s, path=$_selectedVoiceMemo');
       _messages.insert(
           0,
           ChatMessage(
-            text: text,
+            text: _selectedVoiceMemo != null ? "음성 메모" : text,
             isMe: true,
             time: DateTime.now(),
+            imageBytes: imageBytes,
+            fileName: _selectedFile?.name,
+            fileSize: _selectedFile?.size,
+            filePath: _selectedFile?.path,
+            fileBytes: fileBytes,
+            audioPath: _selectedVoiceMemo,
+            audioDuration: _selectedVoiceMemo != null ? Duration(seconds: _voiceMemoDuration) : null,
           ));
+      _selectedImage = null;
+      _selectedFile = null;
+      _selectedVoiceMemo = null;
+      _voiceMemoDuration = 0;
     });
 
     // Auto-reply simulation
@@ -79,6 +167,58 @@ class _ConversationScreenState extends State<ConversationScreen> {
         });
       }
     });
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _selectedImage = image;
+        _selectedFile = null;
+        _selectedVoiceMemo = null;
+      });
+    }
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+      if (result != null) {
+        setState(() {
+          _selectedFile = result.files.first;
+          _selectedImage = null;
+          _selectedVoiceMemo = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
+    }
+  }
+
+  void _showVoiceRecorder(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => VoiceRecorderDialog(
+        onStop: (path, duration) {
+          setState(() {
+            _selectedVoiceMemo = path;
+            _voiceMemoDuration = duration;
+            _selectedImage = null;
+            _selectedFile = null;
+          });
+        },
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 
   void _searchMessages(String query) {
@@ -439,6 +579,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         time: message.time,
                         userImage: widget.userImage,
                         senderName: widget.userName,
+                        imageBytes: message.imageBytes,
+                        imageUrl: message.imageUrl,
+                        fileName: message.fileName,
+                        fileSize: message.fileSize,
+                        filePath: message.filePath,
+                        fileBytes: message.fileBytes,
+                        audioPath: message.audioPath,
+                        audioDuration: message.audioDuration,
                       );
                     },
                   )
@@ -456,6 +604,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         time: message.time,
                         userImage: widget.userImage,
                         senderName: widget.userName,
+                        imageBytes: message.imageBytes,
+                        imageUrl: message.imageUrl,
+                        fileName: message.fileName,
+                        fileSize: message.fileSize,
+                        filePath: message.filePath,
+                        fileBytes: message.fileBytes,
+                        audioPath: message.audioPath,
+                        audioDuration: message.audioDuration,
                       );
                     },
                   ),
@@ -483,7 +639,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       title: const Text('사진'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, '사진을 선택했습니다');
+                        _pickImage();
                       },
                     ),
                     ListTile(
@@ -491,7 +647,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       title: const Text('파일'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, '파일을 선택했습니다');
+                        _pickFile();
                       },
                     ),
                     ListTile(
@@ -500,15 +656,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       title: const Text('음성 메모'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, '음성 메모를 녹음하고 있습니다');
-                      },
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.location_on, color: Colors.red),
-                      title: const Text('위치'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showToast(context, '위치를 공유했습니다');
+                        _showVoiceRecorder(context);
                       },
                     ),
                   ],
@@ -691,55 +839,245 @@ class _ConversationScreenState extends State<ConversationScreen> {
         border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
           children: [
-            IconButton(
-              icon: const Icon(Icons.attach_file, color: Color(0xFF999999)),
-              onPressed: () {
-                _showAttachmentMenu(context);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.camera_alt_outlined,
-                  color: Color(0xFF999999)),
-              onPressed: () {
-                _openCamera(context);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
-              onPressed: () {
-                _showAIMenu(context);
-              },
-            ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            // 이미지 미리보기
+            if (_selectedImage != null)
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                margin: const EdgeInsets.only(bottom: 8.0),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(24),
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: TextField(
-                  controller: _messageController,
-                  decoration: const InputDecoration(
-                    hintText: '메시지를 입력하세요',
-                    filled: false,
-                    border: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    hintStyle: TextStyle(color: Color(0xFF999999)),
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  onSubmitted: _handleSubmitted,
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: FutureBuilder<Uint8List>(
+                        future: _selectedImage!.readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Image.memory(
+                              snapshot.data!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                            );
+                          }
+                          return Container(
+                            width: 60,
+                            height: 60,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '사진이 선택되었습니다',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _selectedImage = null;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.send, color: Color(0xFF0095F6), size: 28),
-              onPressed: () => _handleSubmitted(_messageController.text),
+            // 파일 미리보기
+            if (_selectedFile != null)
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                margin: const EdgeInsets.only(bottom: 8.0),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.blue[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.insert_drive_file,
+                          color: Colors.blue, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedFile!.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _selectedFile = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            // 음성 메모 미리보기
+            if (_selectedVoiceMemo != null)
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                margin: const EdgeInsets.only(bottom: 8.0),
+                decoration: BoxDecoration(
+                  color: Colors.purple[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.purple[200]!),
+                ),
+                child: Row(
+                  children: [
+                    // 재생/일시정지 버튼
+                    IconButton(
+                      icon: Icon(
+                        _isPreviewPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        color: Colors.purple,
+                        size: 40,
+                      ),
+                      onPressed: () async {
+                        if (_isPreviewPlaying) {
+                          await _previewAudioPlayer.pause();
+                        } else {
+                          // Web에서는 blob URL을 사용하므로 UrlSource 사용
+                          if (_selectedVoiceMemo!.startsWith('blob:')) {
+                            await _previewAudioPlayer.play(UrlSource(_selectedVoiceMemo!));
+                          } else {
+                            await _previewAudioPlayer.play(DeviceFileSource(_selectedVoiceMemo!));
+                          }
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '음성 메모',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            _isPreviewPlaying
+                                ? '${_formatDuration(_previewCurrentPosition)} / ${_formatDuration(_previewTotalDuration)}'
+                                : '${_voiceMemoDuration ~/ 60}:${(_voiceMemoDuration % 60).toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () async {
+                        await _previewAudioPlayer.stop();
+                        setState(() {
+                          _selectedVoiceMemo = null;
+                          _voiceMemoDuration = 0;
+                          _isPreviewPlaying = false;
+                          _previewCurrentPosition = Duration.zero;
+                          _previewTotalDuration = Duration.zero;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.attach_file, color: Color(0xFF999999)),
+                  onPressed: () {
+                    _showAttachmentMenu(context);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.camera_alt_outlined,
+                      color: Color(0xFF999999)),
+                  onPressed: () {
+                    _openCamera(context);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
+                  onPressed: () {
+                    _showAIMenu(context);
+                  },
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(
+                        hintText: '메시지를 입력하세요',
+                        filled: false,
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        hintStyle: TextStyle(color: Color(0xFF999999)),
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onSubmitted: _handleSubmitted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send, color: Color(0xFF0095F6), size: 28),
+                  onPressed: () => _handleSubmitted(_messageController.text),
+                ),
+              ],
             ),
           ],
         ),
@@ -752,20 +1090,44 @@ class ChatMessage {
   final String text;
   final bool isMe;
   final DateTime time;
+  final Uint8List? imageBytes;
+  final String? imageUrl;
+  final String? fileName;
+  final int? fileSize;
+  final String? filePath;
+  final Uint8List? fileBytes;
+  final String? audioPath;
+  final Duration? audioDuration;
 
   ChatMessage({
     required this.text,
     required this.isMe,
     required this.time,
+    this.imageBytes,
+    this.imageUrl,
+    this.fileName,
+    this.fileSize,
+    this.filePath,
+    this.fileBytes,
+    this.audioPath,
+    this.audioDuration,
   });
 }
 
-class MessageBubble extends StatelessWidget {
+class MessageBubble extends StatefulWidget {
   final String message;
   final bool isMe;
   final DateTime time;
   final String? userImage;
   final String senderName;
+  final Uint8List? imageBytes;
+  final String? imageUrl;
+  final String? fileName;
+  final int? fileSize;
+  final String? filePath;
+  final Uint8List? fileBytes;
+  final String? audioPath;
+  final Duration? audioDuration;
 
   const MessageBubble({
     Key? key,
@@ -774,7 +1136,165 @@ class MessageBubble extends StatelessWidget {
     required this.time,
     this.userImage,
     required this.senderName,
+    this.imageBytes,
+    this.imageUrl,
+    this.fileName,
+    this.fileSize,
+    this.filePath,
+    this.fileBytes,
+    this.audioPath,
+    this.audioDuration,
   }) : super(key: key);
+
+  @override
+  State<MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<MessageBubble> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+  Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
+  Timer? _positionTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.audioPath != null) {
+      print('🎵 MessageBubble init: audioPath=${widget.audioPath}, audioDuration=${widget.audioDuration}');
+      
+      // Set initial duration from widget
+      if (widget.audioDuration != null) {
+        setState(() {
+          _totalDuration = widget.audioDuration!;
+        });
+        print('⏱️ Initial duration set: ${widget.audioDuration}');
+      }
+      
+      _audioPlayer.onPlayerStateChanged.listen((state) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = state == PlayerState.playing;
+          });
+        }
+      });
+
+      _audioPlayer.onDurationChanged.listen((duration) {
+        if (mounted) {
+          print('⏱️ Duration changed: $duration');
+          // 0초로 변경되는 경우, 기존에 유효한 시간이 있다면 무시
+          if (duration == Duration.zero && _totalDuration > Duration.zero) {
+            print('⚠️ Ignoring zero duration update as we have valid duration: $_totalDuration');
+            return;
+          }
+          setState(() {
+            _totalDuration = duration;
+          });
+        }
+      });
+
+      _audioPlayer.onPositionChanged.listen((position) {
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+          });
+        }
+      });
+
+      _audioPlayer.onPlayerComplete.listen((event) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = false;
+            _currentPosition = Duration.zero;
+          });
+        }
+      });
+
+      // Load audio source to get actual duration
+      _loadAudioDuration();
+    }
+  }
+
+  Future<void> _loadAudioDuration() async {
+    try {
+      print('📂 Loading audio file: ${widget.audioPath}');
+      
+      // Web에서는 blob URL을 사용하므로 setSourceUrl 사용
+      if (widget.audioPath!.startsWith('blob:')) {
+        print('🌐 Using setSourceUrl for blob URL');
+        await _audioPlayer.setSourceUrl(widget.audioPath!);
+      } else {
+        print('📱 Using setSourceDeviceFile for file path');
+        await _audioPlayer.setSourceDeviceFile(widget.audioPath!);
+      }
+      
+      print('✅ Audio file loaded successfully');
+      // Duration will be set via onDurationChanged listener
+    } catch (e) {
+      print('❌ Error loading audio duration: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _positionTimer?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
+  Future<void> _playPause() async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+      _positionTimer?.cancel();
+      setState(() {
+        _isPlaying = false;
+      });
+    } else {
+      // Web에서는 blob URL을 사용하므로 UrlSource 사용
+      if (widget.audioPath!.startsWith('blob:')) {
+        await _audioPlayer.play(UrlSource(widget.audioPath!));
+      } else {
+        await _audioPlayer.play(DeviceFileSource(widget.audioPath!));
+      }
+      
+      setState(() {
+        _isPlaying = true;
+      });
+      
+      // Web에서 position 업데이트를 위한 타이머
+      _positionTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+        if (mounted && _isPlaying) {
+          final position = await _audioPlayer.getCurrentPosition();
+          final duration = await _audioPlayer.getDuration();
+          
+          if (mounted) {
+            setState(() {
+              if (position != null) _currentPosition = position;
+              if (duration != null && duration > Duration.zero) _totalDuration = duration;
+            });
+          }
+          
+          // 재생 완료 체크
+          if (position != null && duration != null && position >= duration) {
+            timer.cancel();
+            if (mounted) {
+              setState(() {
+                _isPlaying = false;
+                _currentPosition = Duration.zero;
+              });
+            }
+          }
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -782,24 +1302,24 @@ class MessageBubble extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            widget.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isMe) ...[
+          if (!widget.isMe) ...[
             Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
                 color: Colors.grey[200],
                 shape: BoxShape.circle,
-                image: userImage != null && userImage!.isNotEmpty
+                image: widget.userImage != null && widget.userImage!.isNotEmpty
                     ? DecorationImage(
-                        image: NetworkImage(userImage!),
+                        image: NetworkImage(widget.userImage!),
                         fit: BoxFit.cover,
                       )
                     : null,
               ),
-              child: userImage == null || userImage!.isEmpty
+              child: widget.userImage == null || widget.userImage!.isEmpty
                   ? const Icon(Icons.person, size: 20, color: Colors.grey)
                   : null,
             ),
@@ -807,13 +1327,13 @@ class MessageBubble extends StatelessWidget {
           ],
           Column(
             crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              if (!isMe) ...[
+              if (!widget.isMe) ...[
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    senderName,
+                    widget.senderName,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -825,11 +1345,11 @@ class MessageBubble extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (isMe) ...[
+                  if (widget.isMe) ...[ 
                     Padding(
                       padding: const EdgeInsets.only(right: 4),
                       child: Text(
-                        '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
+                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 10,
@@ -837,37 +1357,197 @@ class MessageBubble extends StatelessWidget {
                       ),
                     ),
                   ],
-                  Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? const Color(0xFF0095F6)
-                          : const Color(
-                              0xFFF0F0F0), // Solid blue for me, light grey for others
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: Radius.circular(isMe ? 20 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 20),
-                      ),
-                    ),
-                    child: Text(
-                      message,
-                      style: TextStyle(
-                        color: isMe ? Colors.white : Colors.black,
-                        fontSize: 15,
-                      ),
-                    ),
+                  // 미디어 콘텐츠와 텍스트를 Column으로 분리
+                  Column(
+                    crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      // 이미지 표시 (말풍선 밖)
+                      if (widget.imageBytes != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            widget.imageBytes!,
+                            width: 200,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
+                      ],
+                      // 파일 표시 (말풍선 밖)
+                      if (widget.fileName != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: widget.isMe
+                                ? const Color(0xFF0095F6)
+                                : const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.insert_drive_file,
+                                color: widget.isMe ? Colors.white : Colors.blue,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.fileName!,
+                                    style: TextStyle(
+                                      color: widget.isMe ? Colors.white : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (widget.fileSize != null)
+                                    Text(
+                                      '${(widget.fileSize! / 1024).toStringAsFixed(1)} KB',
+                                      style: TextStyle(
+                                        color: widget.isMe
+                                            ? Colors.white.withValues(alpha: 0.8)
+                                            : Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (widget.fileBytes != null) ...[
+                                const SizedBox(width: 12),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.download,
+                                    color: widget.isMe ? Colors.white : Colors.blue,
+                                    size: 24,
+                                  ),
+                                  onPressed: () async {
+                                    if (widget.fileBytes != null && widget.fileName != null) {
+                                      await FileDownloadHelper.downloadFile(
+                                        fileBytes: widget.fileBytes!,
+                                        fileName: widget.fileName!,
+                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('${widget.fileName} 다운로드 완료'),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
+                      ],
+                      // 오디오 플레이어 (말풍선 밖)
+                      if (widget.audioPath != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: widget.isMe
+                                ? const Color(0xFF0095F6)
+                                : const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: widget.isMe ? Colors.white : Colors.purple,
+                                  size: 28,
+                                ),
+                                onPressed: _playPause,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '음성 메모',
+                                    style: TextStyle(
+                                      color: widget.isMe ? Colors.white : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    width: 150,
+                                    child: LinearProgressIndicator(
+                                      value: (_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration).inMilliseconds > 0
+                                          ? (_currentPosition.inMilliseconds / (_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration).inMilliseconds).clamp(0.0, 1.0)
+                                          : 0.0,
+                                      backgroundColor: widget.isMe ? Colors.white.withValues(alpha: 0.3) : Colors.grey[300],
+                                      valueColor: AlwaysStoppedAnimation<Color>(widget.isMe ? Colors.white : Colors.purple),
+                                      minHeight: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_formatDuration(_currentPosition)} / ${_formatDuration(_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration)}',
+                                    style: TextStyle(
+                                      color: widget.isMe
+                                          ? Colors.white.withValues(alpha: 0.8)
+                                          : Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (widget.message.isNotEmpty && widget.message != '음성 메모')
+                          const SizedBox(height: 8),
+                      ],
+                      // 텍스트 메시지 (말풍선 안)
+                      if (widget.message.isNotEmpty &&
+                          (widget.audioPath == null || widget.message != '음성 메모'))
+                        Container(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.7,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: widget.isMe
+                                ? const Color(0xFF0095F6)
+                                : const Color(0xFFF0F0F0),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(20),
+                              topRight: const Radius.circular(20),
+                              bottomLeft: Radius.circular(widget.isMe ? 20 : 4),
+                              bottomRight: Radius.circular(widget.isMe ? 4 : 20),
+                            ),
+                          ),
+                          child: Text(
+                            widget.message,
+                            style: TextStyle(
+                              color: widget.isMe ? Colors.white : Colors.black,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  if (!isMe) ...[
+                  if (!widget.isMe) ...[
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
                       child: Text(
-                        '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
+                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 10,

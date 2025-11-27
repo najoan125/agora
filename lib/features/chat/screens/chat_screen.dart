@@ -126,7 +126,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   labelColor: Colors.black,
                   unselectedLabelColor: const Color(0xFF8E8E93),
                   indicatorColor: Colors.black,
-                  indicatorWeight: 1.0,
+                  indicatorWeight: 1.7,
                   labelPadding: EdgeInsets.zero,
                   indicatorSize: TabBarIndicatorSize.tab,
                   tabs: [
