@@ -10,6 +10,7 @@ import 'dart:async';
 import '../../../core/utils/file_download_helper.dart';
 import '../widgets/voice_recorder_dialog.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'media_gallery_screen.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String userName;
@@ -35,8 +36,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showSearch = false;
   List<ChatMessage> _searchResults = [];
-  XFile? _selectedImage;
-  PlatformFile? _selectedFile;
+  List<XFile> _selectedImages = []; // Changed from single to list
+  List<PlatformFile> _selectedFiles = []; // Changed from single to list
   String? _selectedVoiceMemo;
   int _voiceMemoDuration = 0;
   
@@ -114,86 +115,140 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   void _handleSubmitted(String text) async {
-    if (text.trim().isEmpty && _selectedImage == null && _selectedFile == null && _selectedVoiceMemo == null) return;
+    if (text.trim().isEmpty && _selectedImages.isEmpty && _selectedFiles.isEmpty && _selectedVoiceMemo == null) return;
 
-    Uint8List? imageBytes;
-    if (_selectedImage != null) {
-      imageBytes = await _selectedImage!.readAsBytes();
-    }
-
-    Uint8List? fileBytes;
-    if (_selectedFile != null) {
-      if (_selectedFile!.bytes != null) {
-        fileBytes = _selectedFile!.bytes;
-      } else if (_selectedFile!.path != null) {
-        fileBytes = await File(_selectedFile!.path!).readAsBytes();
+    try {
+      // Convert multiple images to bytes
+      List<Uint8List>? imageBytesList;
+      if (_selectedImages.isNotEmpty) {
+        imageBytesList = [];
+        for (var image in _selectedImages) {
+          final bytes = await image.readAsBytes();
+          imageBytesList.add(bytes);
+          print('📸 Image processed: ${bytes.length} bytes');
+        }
+        print('📸 Total images processed: ${imageBytesList.length}');
       }
-    }
 
-    _messageController.clear();
-    setState(() {
-      print('📤 Sending voice memo: duration=${_voiceMemoDuration}s, path=$_selectedVoiceMemo');
-      _messages.insert(
-          0,
-          ChatMessage(
-            text: _selectedVoiceMemo != null ? "음성 메모" : text,
-            isMe: true,
-            time: DateTime.now(),
-            imageBytes: imageBytes,
-            fileName: _selectedFile?.name,
-            fileSize: _selectedFile?.size,
-            filePath: _selectedFile?.path,
-            fileBytes: fileBytes,
-            audioPath: _selectedVoiceMemo,
-            audioDuration: _selectedVoiceMemo != null ? Duration(seconds: _voiceMemoDuration) : null,
-          ));
-      _selectedImage = null;
-      _selectedFile = null;
-      _selectedVoiceMemo = null;
-      _voiceMemoDuration = 0;
-    });
-
-    // Auto-reply simulation
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          _messages.insert(
-              0,
-              ChatMessage(
-                text: "자동 응답입니다. 잠시 후 다시 연락드리겠습니다.",
-                isMe: false,
-                time: DateTime.now(),
-              ));
-        });
+      // Convert multiple files to a list
+      List<Map<String, dynamic>>? filesList;
+      if (_selectedFiles.isNotEmpty) {
+        filesList = [];
+        for (var file in _selectedFiles) {
+          Uint8List? fileBytes;
+          if (file.bytes != null) {
+            fileBytes = file.bytes;
+          } else if (file.path != null) {
+            fileBytes = await File(file.path!).readAsBytes();
+          }
+          
+          filesList.add({
+            'name': file.name,
+            'size': file.size,
+            'path': file.path,
+            'bytes': fileBytes,
+          });
+          print('📎 File processed: ${file.name}, ${file.size} bytes');
+        }
+        print('📎 Total files processed: ${filesList.length}');
       }
-    });
+
+      _messageController.clear();
+      setState(() {
+        print('📤 Sending message: images=${imageBytesList?.length}, files=${filesList?.length}, voice=${_selectedVoiceMemo}');
+        _messages.insert(
+            0,
+            ChatMessage(
+              text: _selectedVoiceMemo != null ? "음성 메모" : text,
+              isMe: true,
+              time: DateTime.now(),
+              imageBytesList: imageBytesList,
+              filesList: filesList,
+              audioPath: _selectedVoiceMemo,
+              audioDuration: _selectedVoiceMemo != null ? Duration(seconds: _voiceMemoDuration) : null,
+            ));
+        _selectedImages = [];
+        _selectedFiles = [];
+        _selectedVoiceMemo = null;
+        _voiceMemoDuration = 0;
+      });
+
+      // Auto-reply simulation
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _messages.insert(
+                0,
+                ChatMessage(
+                  text: "자동 응답입니다. 잠시 후 다시 연락드리겠습니다.",
+                  isMe: false,
+                  time: DateTime.now(),
+                ));
+          });
+        }
+      });
+    } catch (e) {
+      print('❌ Error sending message: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다: $e')),
+      );
+    }
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
-      setState(() {
-        _selectedImage = image;
-        _selectedFile = null;
-        _selectedVoiceMemo = null;
-      });
+    try {
+      final ImagePicker picker = ImagePicker();
+      print('📸 Starting pickMultiImage...');
+      
+      // Try pickMultiImage with explicit parameters
+      final List<XFile> images = await picker.pickMultiImage(
+        imageQuality: 85,
+      );
+      
+      print('📸 Selected ${images.length} images');
+      
+      if (images.isNotEmpty) {
+        print('📸 Image details:');
+        for (int i = 0; i < images.length; i++) {
+          print('  Image $i: ${images[i].name}, path: ${images[i].path}');
+        }
+        
+        setState(() {
+          // Add to existing images instead of replacing
+          _selectedImages.addAll(images);
+          _selectedFiles = [];
+          _selectedVoiceMemo = null;
+        });
+        print('✅ Total images in state: ${_selectedImages.length} images');
+      } else {
+        print('⚠️ No images selected');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error picking images: $e');
+      print('❌ Stack trace: $stackTrace');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('이미지 선택 중 오류가 발생했습니다: $e')),
+      );
     }
   }
 
   Future<void> _pickFile() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+      );
 
-      if (result != null) {
+      if (result != null && result.files.isNotEmpty) {
         setState(() {
-          _selectedFile = result.files.first;
-          _selectedImage = null;
+          // Add to existing files instead of replacing
+          _selectedFiles.addAll(result.files);
+          _selectedImages = [];
           _selectedVoiceMemo = null;
         });
+        print('📎 Total files selected: ${_selectedFiles.length}');
       }
     } catch (e) {
+      print('❌ Error picking files: $e');
       debugPrint('Error picking file: $e');
     }
   }
@@ -206,8 +261,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           setState(() {
             _selectedVoiceMemo = path;
             _voiceMemoDuration = duration;
-            _selectedImage = null;
-            _selectedFile = null;
+            _selectedImages = [];
+            _selectedFiles = [];
           });
         },
       ),
@@ -461,7 +516,79 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     title: const Text('사진/동영상'),
                     trailing: const Icon(Icons.arrow_forward_ios,
                         size: 14, color: AppTheme.textSecondary),
-                    onTap: () => _showToast(context, '사진/동영상 보관함'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MediaGalleryScreen(
+                            messages: _messages,
+                            initialTabIndex: 0,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Media Preview Section
+                  Builder(
+                    builder: (context) {
+                      // Collect all images from both imageBytes and imageBytesList
+                      final List<Uint8List> allImages = [];
+                      
+                      for (var message in _messages) {
+                        if (message.imageBytesList != null && message.imageBytesList!.isNotEmpty) {
+                          allImages.addAll(message.imageBytesList!);
+                        } else if (message.imageBytes != null) {
+                          allImages.add(message.imageBytes!);
+                        }
+                      }
+                      
+                      if (allImages.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        child: SizedBox(
+                          height: 100,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: allImages.take(5).length,
+                            itemBuilder: (context, index) {
+                              final imageBytes = allImages[index];
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                                        backgroundColor: Colors.black,
+                                        body: Center(
+                                          child: Image.memory(imageBytes),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 100,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: MemoryImage(imageBytes),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.folder_outlined,
@@ -469,7 +596,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     title: const Text('파일'),
                     trailing: const Icon(Icons.arrow_forward_ios,
                         size: 14, color: AppTheme.textSecondary),
-                    onTap: () => _showToast(context, '파일 보관함'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MediaGalleryScreen(
+                            messages: _messages,
+                            initialTabIndex: 1,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   ListTile(
                     leading:
@@ -477,7 +615,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     title: const Text('링크'),
                     trailing: const Icon(Icons.arrow_forward_ios,
                         size: 14, color: AppTheme.textSecondary),
-                    onTap: () => _showToast(context, '링크 보관함'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MediaGalleryScreen(
+                            messages: _messages,
+                            initialTabIndex: 2,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const Divider(),
                   ListTile(
@@ -580,11 +729,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         userImage: widget.userImage,
                         senderName: widget.userName,
                         imageBytes: message.imageBytes,
+                        imageBytesList: message.imageBytesList,
                         imageUrl: message.imageUrl,
                         fileName: message.fileName,
                         fileSize: message.fileSize,
                         filePath: message.filePath,
                         fileBytes: message.fileBytes,
+                        filesList: message.filesList,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
                       );
@@ -605,11 +756,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         userImage: widget.userImage,
                         senderName: widget.userName,
                         imageBytes: message.imageBytes,
+                        imageBytesList: message.imageBytesList,
                         imageUrl: message.imageUrl,
                         fileName: message.fileName,
                         fileSize: message.fileSize,
                         filePath: message.filePath,
                         fileBytes: message.fileBytes,
+                        filesList: message.filesList,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
                       );
@@ -801,6 +954,58 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
             const SizedBox(height: 20),
             ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('사진/동영상'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MediaGalleryScreen(
+                      messages: _messages,
+                      initialTabIndex: 0,
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: const Text('파일'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MediaGalleryScreen(
+                      messages: _messages,
+                      initialTabIndex: 1,
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('링크'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MediaGalleryScreen(
+                      messages: _messages,
+                      initialTabIndex: 2,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
               title: const Text('채팅방 이름 설정'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {},
@@ -842,7 +1047,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         child: Column(
           children: [
             // 이미지 미리보기
-            if (_selectedImage != null)
+            if (_selectedImages.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(8.0),
                 margin: const EdgeInsets.only(bottom: 8.0),
@@ -850,55 +1055,103 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: FutureBuilder<Uint8List>(
-                        future: _selectedImage!.readAsBytes(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData) {
-                            return Image.memory(
-                              snapshot.data!,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                            );
-                          }
-                          return Container(
-                            width: 60,
-                            height: 60,
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: CircularProgressIndicator(),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_selectedImages.length}장 선택됨',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setState(() {
+                                _selectedImages = [];
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 80,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedImages.length,
+                        itemBuilder: (context, index) {
+                          return Stack(
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(right: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: FutureBuilder<Uint8List>(
+                                    future: _selectedImages[index].readAsBytes(),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.hasData) {
+                                        return Image.memory(
+                                          snapshot.data!,
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                        );
+                                      }
+                                      return Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey[300],
+                                        child: const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 12,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedImages.removeAt(index);
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '사진이 선택되었습니다',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          _selectedImage = null;
-                        });
-                      },
                     ),
                   ],
                 ),
               ),
             // 파일 미리보기
-            if (_selectedFile != null)
+            if (_selectedFiles.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(8.0),
                 margin: const EdgeInsets.only(bottom: 8.0),
@@ -906,50 +1159,94 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.blue[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.insert_drive_file,
-                          color: Colors.blue, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _selectedFile!.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB',
+                            '${_selectedFiles.length}개 파일 선택됨',
                             style: TextStyle(
                               color: Colors.grey[600],
-                              fontSize: 12,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setState(() {
+                                _selectedFiles = [];
+                              });
+                            },
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          _selectedFile = null;
-                        });
-                      },
-                    ),
+                    ...List.generate(_selectedFiles.length, (index) {
+                      final file = _selectedFiles[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8.0),
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.blue[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.insert_drive_file,
+                                  color: Colors.blue, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    file.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '${(file.size / 1024).toStringAsFixed(1)} KB',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFiles.removeAt(index);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -1090,12 +1387,14 @@ class ChatMessage {
   final String text;
   final bool isMe;
   final DateTime time;
-  final Uint8List? imageBytes;
+  final Uint8List? imageBytes; // Single image (backward compatibility)
+  final List<Uint8List>? imageBytesList; // Multiple images
   final String? imageUrl;
-  final String? fileName;
-  final int? fileSize;
-  final String? filePath;
-  final Uint8List? fileBytes;
+  final String? fileName; // Single file (backward compatibility)
+  final int? fileSize; // Single file (backward compatibility)
+  final String? filePath; // Single file (backward compatibility)
+  final Uint8List? fileBytes; // Single file (backward compatibility)
+  final List<Map<String, dynamic>>? filesList; // Multiple files
   final String? audioPath;
   final Duration? audioDuration;
 
@@ -1104,11 +1403,13 @@ class ChatMessage {
     required this.isMe,
     required this.time,
     this.imageBytes,
+    this.imageBytesList,
     this.imageUrl,
     this.fileName,
     this.fileSize,
     this.filePath,
     this.fileBytes,
+    this.filesList,
     this.audioPath,
     this.audioDuration,
   });
@@ -1120,12 +1421,14 @@ class MessageBubble extends StatefulWidget {
   final DateTime time;
   final String? userImage;
   final String senderName;
-  final Uint8List? imageBytes;
+  final Uint8List? imageBytes; // Single image (backward compatibility)
+  final List<Uint8List>? imageBytesList; // Multiple images
   final String? imageUrl;
-  final String? fileName;
-  final int? fileSize;
-  final String? filePath;
-  final Uint8List? fileBytes;
+  final String? fileName; // Single file (backward compatibility)
+  final int? fileSize; // Single file (backward compatibility)
+  final String? filePath; // Single file (backward compatibility)
+  final Uint8List? fileBytes; // Single file (backward compatibility)
+  final List<Map<String, dynamic>>? filesList; // Multiple files
   final String? audioPath;
   final Duration? audioDuration;
 
@@ -1137,11 +1440,13 @@ class MessageBubble extends StatefulWidget {
     this.userImage,
     required this.senderName,
     this.imageBytes,
+    this.imageBytesList,
     this.imageUrl,
     this.fileName,
     this.fileSize,
     this.filePath,
     this.fileBytes,
+    this.filesList,
     this.audioPath,
     this.audioDuration,
   }) : super(key: key);
@@ -1362,19 +1667,195 @@ class _MessageBubbleState extends State<MessageBubble> {
                     crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
                       // 이미지 표시 (말풍선 밖)
-                      if (widget.imageBytes != null) ...[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.memory(
-                            widget.imageBytes!,
-                            width: 200,
-                            fit: BoxFit.cover,
-                          ),
+                      if (widget.imageBytes != null || (widget.imageBytesList != null && widget.imageBytesList!.isNotEmpty)) ...[
+                        Builder(
+                          builder: (context) {
+                            final images = widget.imageBytesList ?? [widget.imageBytes!];
+                            
+                            if (images.length == 1) {
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                                        backgroundColor: Colors.black,
+                                        body: Center(
+                                          child: Image.memory(images[0]),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 240,
+                                      maxHeight: 320,
+                                    ),
+                                    child: Image.memory(
+                                      images[0],
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            // Grid layout for multiple images
+                            return SizedBox(
+                              width: 240,
+                              child: Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: List.generate(images.length, (index) {
+                                  // Calculate size based on image count
+                                  double size;
+                                  if (images.length == 2 || images.length == 4) {
+                                    size = (240 - 4) / 2; // 2 columns
+                                  } else {
+                                    size = (240 - 8) / 3; // 3 columns
+                                  }
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => Scaffold(
+                                            appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                                            backgroundColor: Colors.black,
+                                            body: PageView.builder(
+                                              controller: PageController(initialPage: index),
+                                              itemCount: images.length,
+                                              itemBuilder: (context, pageIndex) {
+                                                return Center(
+                                                  child: Image.memory(
+                                                    images[pageIndex],
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      print('❌ Error displaying full screen image: $error');
+                                                      return const Icon(Icons.error, color: Colors.white);
+                                                    },
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.memory(
+                                        images[index],
+                                        width: size,
+                                        height: size,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          print('❌ Error displaying grid image: $error');
+                                          return Container(
+                                            width: size,
+                                            height: size,
+                                            color: Colors.grey[300],
+                                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            );
+                          },
                         ),
                         if (widget.message.isNotEmpty) const SizedBox(height: 8),
                       ],
                       // 파일 표시 (말풍선 밖)
-                      if (widget.fileName != null) ...[
+                      // Multiple files support
+                      if (widget.filesList != null && widget.filesList!.isNotEmpty) ...[
+                        ...widget.filesList!.map((fileData) {
+                          final fileName = fileData['name'] as String?;
+                          final fileSize = fileData['size'] as int?;
+                          final fileBytes = fileData['bytes'] as Uint8List?;
+                          
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4.0),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: widget.isMe
+                                    ? const Color(0xFF0095F6)
+                                    : const Color(0xFFF0F0F0),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.insert_drive_file,
+                                    color: widget.isMe ? Colors.white : Colors.blue,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (fileName != null)
+                                        Text(
+                                          fileName,
+                                          style: TextStyle(
+                                            color: widget.isMe ? Colors.white : Colors.black,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      if (fileSize != null)
+                                        Text(
+                                          '${(fileSize / 1024).toStringAsFixed(1)} KB',
+                                          style: TextStyle(
+                                            color: widget.isMe
+                                                ? Colors.white.withValues(alpha: 0.8)
+                                                : Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (fileBytes != null && fileName != null) ...[ 
+                                    const SizedBox(width: 12),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.download,
+                                        color: widget.isMe ? Colors.white : Colors.blue,
+                                        size: 24,
+                                      ),
+                                      onPressed: () async {
+                                        await FileDownloadHelper.downloadFile(
+                                          fileBytes: fileBytes,
+                                          fileName: fileName,
+                                        );
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('$fileName 다운로드 완료'),
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
+                      ]
+                      // Single file (backward compatibility)
+                      else if (widget.fileName != null) ...[
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
