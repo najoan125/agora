@@ -1,6 +1,5 @@
 // 앱 전체에서 사용되는 데이터 관리 및 모의 데이터 제공
 
-
 class DataManager {
   static final DataManager _instance = DataManager._internal();
 

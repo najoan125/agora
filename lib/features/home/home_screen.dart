@@ -28,7 +28,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final FocusNode _searchFocusNode = FocusNode();
   String _sortOption = 'recent'; // 'recent' or 'name'
   String _searchQuery = '';
-  final List<String> _recentSearches = ['등산', '프로젝트', '회식', '스터디'];
   bool _isMenuOpen = false;
   bool _isGroupChatExpanded = true;
   bool _isTeamListExpanded = true;
@@ -353,58 +352,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           SliverList(
             delegate: SliverChildListDelegate(
               [
-                // Recent & Related Searches
+                // Recent & Related Searches - Removed
                 if (_searchFocusNode.hasFocus && _searchQuery.isEmpty)
-                  Container(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE0E0E0)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Recent Searches
-                        ..._recentSearches.map((search) => InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _searchQuery = search;
-                                  _searchFocusNode.unfocus();
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 10),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.access_time,
-                                        size: 18,
-                                        color: AppTheme.textSecondary),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      search,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        color: AppTheme.textPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )),
-                      ],
-                    ),
-                  ),
+                  const SizedBox.shrink(),
 
                 const SizedBox(height: 10),
 
@@ -651,13 +601,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+
   Widget _buildTeamList() {
     final user = _dataManager.currentUser;
     final teams = _dataManager.teams;
     
-    final mainTeamIndex = teams.indexWhere((t) => t['isMain'] == true);
-    final Map<String, dynamic>? mainTeam = mainTeamIndex != -1 ? teams[mainTeamIndex] : null;
-    final otherTeams = teams.where((t) => t['isMain'] != true).toList();
+    final myTeams = teams.where((t) => (t['members'] as List).contains(user['name'])).toList();
+    final otherTeams = teams.where((t) => !(t['members'] as List).contains(user['name'])).toList();
 
     return GestureDetector(
       onTap: () {
@@ -687,12 +637,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               [
                 const SizedBox(height: 20),
           
-                // Main Team Section
-                if (mainTeam != null)
+                // My Teams Section
+                if (myTeams.isNotEmpty)
                   CollapsibleSection(
                     title: '내 소속',
-                    count: 1,
-                    child: _buildTeamTile(mainTeam, showBorder: false),
+                    count: myTeams.length,
+                    child: Column(
+                      children: myTeams.map((team) => _buildTeamTile(team, showBorder: false)).toList(),
+                    ),
                   ),
 
                 // Other Teams Section
@@ -798,69 +750,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildFloatingSearchBar() {
     return Container(
-      padding: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      color: Colors.white,
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: TextField(
+          focusNode: _searchFocusNode,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onSubmitted: (value) {
+            // Search logic if needed
+          },
+          decoration: const InputDecoration(
+            hintText: '검색',
+            prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(vertical: 10),
+            fillColor: Colors.transparent,
+            hoverColor: Colors.transparent,
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: TextField(
-                focusNode: _searchFocusNode,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                onSubmitted: (value) {
-                  if (value.isNotEmpty && !_recentSearches.contains(value)) {
-                    setState(() {
-                      _recentSearches.insert(0, value);
-                      if (_recentSearches.length > 5)
-                        _recentSearches.removeLast();
-                    });
-                  }
-                },
-                decoration: const InputDecoration(
-                  hintText: '검색',
-                  prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  fillColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildTeamTile(Map<String, dynamic> team, {bool showBorder = true}) {
-    final isMain = team['isMain'] == true;
-    
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -917,30 +836,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               color: AppTheme.textSecondary,
             ),
           ),
-        ),
-        trailing: IconButton(
-          icon: Icon(
-            isMain ? Icons.star : Icons.star_border,
-            color: isMain ? Colors.amber : Colors.grey,
-            size: 28,
-          ),
-          onPressed: () {
-            setState(() {
-              if (isMain) {
-                _dataManager.unsetMainTeam(team['name']);
-              } else {
-                _dataManager.setMainTeam(team['name']);
-              }
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(isMain
-                    ? '${team['name']}이(가) 메인 팀에서 해제되었습니다'
-                    : '${team['name']}이(가) 메인 팀으로 설정되었습니다'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          },
         ),
       ),
     );

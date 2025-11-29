@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../../../data/data_manager.dart';
+import '../../../data/auth_service.dart';
 import '../../profile/screens/profile_screen.dart';
 import 'notification_settings_screen.dart';
 import 'privacy_settings_screen.dart';
@@ -287,7 +288,12 @@ class _MoreScreenState extends State<MoreScreen> {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              // 로그아웃 처리
+              await AuthService().logout();
+              
+              if (!context.mounted) return;
+              
               Navigator.pop(context);
               Navigator.pushNamedAndRemoveUntil(
                 context,

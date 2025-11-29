@@ -563,54 +563,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '팀 관리',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                        if (_canManageRoles)
-                          TextButton.icon(
-                            onPressed: _navigateToAddPositionScreen,
-                            icon: const Icon(Icons.add_circle_outline, size: 16),
-                            label: const Text('직급 추가'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.blue,
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(50, 30),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Org Chart Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrgChartScreen(teamName: _teamName),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.account_tree_outlined, size: 18),
-                        label: const Text('조직도 보기'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.black87,
-                          side: BorderSide(color: Colors.grey.shade300),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
+                    const Text(
+                      '팀 관리',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -799,16 +757,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                     ],
                   ),
                 ),
-                PopupMenuItem<int>(
-                  value: 4,
-                  child: const Row(
-                    children: [
-                      Icon(Icons.swap_horiz, size: 18, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text('직급 변경'),
-                    ],
-                  ),
-                ),
                 const PopupMenuDivider(),
                 if (isMe)
                   PopupMenuItem<int>(
@@ -852,8 +800,6 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 if (index != -1) {
                   _showChangeNameDialog(member, index);
                 }
-              } else if (value == 4) {
-                _showChangeRoleDialog(member);
               } else if (value == 5) {
                 _leaveTeam();
               }
