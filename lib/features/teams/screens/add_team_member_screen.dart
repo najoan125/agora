@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 
 class AddTeamMemberScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>) onMemberAdded;
+  final Function(List<Map<String, dynamic>>) onMembersAdded;
 
-  const AddTeamMemberScreen({Key? key, required this.onMemberAdded})
+  const AddTeamMemberScreen({Key? key, required this.onMembersAdded})
       : super(key: key);
 
   @override
@@ -18,6 +18,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
   String _searchQuery = '';
   bool _isSearching = false;
   List<Map<String, dynamic>> _searchResults = [];
+  final Set<Map<String, dynamic>> _selectedMembers = {};
   String _selectedCountryCode = '+82';
 
   final Map<String, String> _countryCodes = {
@@ -128,11 +129,23 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
     });
   }
 
-  void _addMember(Map<String, dynamic> member) {
-    widget.onMemberAdded(member);
+  void _toggleMemberSelection(Map<String, dynamic> member) {
+    setState(() {
+      if (_selectedMembers.contains(member)) {
+        _selectedMembers.remove(member);
+      } else {
+        _selectedMembers.add(member);
+      }
+    });
+  }
+
+  void _addSelectedMembers() {
+    if (_selectedMembers.isEmpty) return;
+
+    widget.onMembersAdded(_selectedMembers.toList());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${member['name']}을(를) 팀원으로 추가했습니다'),
+        content: Text('${_selectedMembers.length}명을 팀원으로 추가했습니다'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -187,12 +200,56 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildPhoneSearchTab(),
-          _buildIdSearchTab(),
-          _buildQrCodeTab(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPhoneSearchTab(),
+                _buildIdSearchTab(),
+                _buildQrCodeTab(),
+              ],
+            ),
+          ),
+          if (_selectedMembers.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _addSelectedMembers,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      '${_selectedMembers.length}명 초대하기',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -439,69 +496,77 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
               itemCount: _availableMembers.take(4).length,
               itemBuilder: (context, index) {
                 final member = _availableMembers[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(20),
-                          image: DecorationImage(
-                            image: NetworkImage(member['image'] as String),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                final isSelected = _selectedMembers.contains(member);
+                
+                return GestureDetector(
+                  onTap: () => _toggleMemberSelection(member),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.blue.withOpacity(0.05) : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Colors.blue : Colors.grey.shade200,
+                        width: isSelected ? 1.5 : 1,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              member['name'] as String,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              member['phone'] as String,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => _addMember(member),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade400,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.person_add,
-                            color: Colors.white,
-                            size: 20,
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(20),
+                            image: DecorationImage(
+                              image: NetworkImage(member['image'] as String),
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                member['name'] as String,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                member['phone'] as String,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected ? Colors.blue : Colors.white,
+                            border: Border.all(
+                              color: isSelected ? Colors.blue : Colors.grey.shade400,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: isSelected
+                              ? const Icon(Icons.check,
+                                  size: 16, color: Colors.white)
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -565,68 +630,76 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final member = _searchResults[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(20),
-                  image: DecorationImage(
-                    image: NetworkImage(member['image'] as String),
-                    fit: BoxFit.cover,
-                  ),
-                ),
+        final isSelected = _selectedMembers.contains(member);
+
+        return GestureDetector(
+          onTap: () => _toggleMemberSelection(member),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.blue.withOpacity(0.05) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? Colors.blue : Colors.grey.shade200,
+                width: isSelected ? 1.5 : 1,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      member['name'] as String,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      member['phone'] as String,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => _addMember(member),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade400,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.person_add,
-                    color: Colors.white,
-                    size: 20,
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(20),
+                    image: DecorationImage(
+                      image: NetworkImage(member['image'] as String),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member['name'] as String,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        member['phone'] as String,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? Colors.blue : Colors.white,
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey.shade400,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check,
+                          size: 16, color: Colors.white)
+                      : null,
+                ),
+              ],
+            ),
           ),
         );
       },

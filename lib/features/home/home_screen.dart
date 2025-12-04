@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../data/data_manager.dart';
+import '../../shared/providers/profile_provider.dart';
 import '../friends/widgets/friend_tile.dart';
 import '../friends/widgets/friend_request_tile.dart';
 import '../../shared/widgets/collapsible_section.dart';
@@ -104,6 +106,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _tabController.addListener(() {
       setState(() {}); // Rebuild to update AppBar icons when tab changes
     });
+    
+    // 프로필 정보 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadProfile();
+    });
+  }
+
+  Future<void> _loadProfile() async {
+    final profileProvider = context.read<ProfileProvider>();
+    await profileProvider.loadMyProfile();
   }
 
   @override
@@ -305,299 +317,318 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFriendsTab() {
-    final user = _dataManager.currentUser;
-    final friends = _dataManager.friends;
+    return Consumer<ProfileProvider>(
+      builder: (context, profileProvider, child) {
+        // 프로필이 로드되지 않았으면 로딩 표시
+        if (profileProvider.isLoading && profileProvider.myProfile == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    final filteredFriends = _searchQuery.isEmpty
-        ? List<Map<String, dynamic>>.from(friends)
-        : friends
-            .where((f) =>
-                f['name'].toLowerCase().contains(_searchQuery.toLowerCase()))
-            .toList();
+        // 프로필 정보 가져오기 (없으면 기본값 사용)
+        final profile = profileProvider.myProfile;
+        final user = profile != null
+            ? {
+                'name': profile.displayName,
+                'statusMessage': profile.statusMessage ?? '상태 메시지를 설정하세요',
+                'image': profile.profileImageUrl,
+                'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
+              }
+            : _dataManager.currentUser;
 
-    if (_sortOption == 'name') {
-      filteredFriends
-          .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
-    }
-    // 'recent' option keeps the original order (assuming it's already sorted by recent or default)
+        final friends = _dataManager.friends;
 
-    final favorites =
-        filteredFriends.where((f) => f['isFavorite'] == true).toList();
-    final birthdays =
-        filteredFriends.where((f) => f['isBirthday'] == true).toList();
-    final otherFriends = filteredFriends;
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: _buildProfileHeader(user),
-          ),
-          SliverAppBar(
-            backgroundColor: Colors.white,
-            expandedHeight: 74.0, // Height of search bar + padding
-            toolbarHeight: 74.0,
-            collapsedHeight: 74.0,
-            floating: true,
-            snap: true,
-            pinned: false,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.none,
-              background: _buildFloatingSearchBar(),
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildListDelegate(
-              [
-                // Recent & Related Searches - Removed
-                if (_searchFocusNode.hasFocus && _searchQuery.isEmpty)
-                  const SizedBox.shrink(),
+        final filteredFriends = _searchQuery.isEmpty
+            ? List<Map<String, dynamic>>.from(friends)
+            : friends
+                .where((f) =>
+                    f['name'].toLowerCase().contains(_searchQuery.toLowerCase()))
+                .toList();
 
-                const SizedBox(height: 10),
+        if (_sortOption == 'name') {
+          filteredFriends
+              .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+        }
+        // 'recent' option keeps the original order (assuming it's already sorted by recent or default)
 
-                // Group Chats with + icon and collapsible
-                Column(
-                  children: [
-                    const Divider(
-                        height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _isGroupChatExpanded = !_isGroupChatExpanded;
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                        child: Row(
-                          children: [
-                            const Text(
-                              '그룹채팅',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${_groupChats.length}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            const Spacer(),
-                            const SizedBox(width: 8),
-                            Icon(
-                              _isGroupChatExpanded
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (_isGroupChatExpanded)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 32, vertical: 12),
-                        height: 120,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Create Group Button
-                              Padding(
-                                padding: const EdgeInsets.only(right: 20.0),
-                                child: GestureDetector(
-                                  onTap: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const CreateGroupScreen(),
-                                      ),
-                                    );
+        final favorites =
+            filteredFriends.where((f) => f['isFavorite'] == true).toList();
+        final birthdays =
+            filteredFriends.where((f) => f['isBirthday'] == true).toList();
+        final otherFriends = filteredFriends;
+        return GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _buildProfileHeader(user),
+              ),
+              SliverAppBar(
+                backgroundColor: Colors.white,
+                expandedHeight: 74.0, // Height of search bar + padding
+                toolbarHeight: 74.0,
+                collapsedHeight: 74.0,
+                floating: true,
+                snap: true,
+                pinned: false,
+                elevation: 0,
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.none,
+                  background: _buildFloatingSearchBar(),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildListDelegate(
+                  [
+                    // Recent & Related Searches - Removed
+                    if (_searchFocusNode.hasFocus && _searchQuery.isEmpty)
+                      const SizedBox.shrink(),
 
-                                    if (result != null &&
-                                        result is Map<String, dynamic>) {
-                                      setState(() {
-                                        _groupChats.insert(0, result);
-                                      });
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                '그룹 "${result['name']}" 생성 완료!')),
-                                      );
-                                    }
-                                  },
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        width: 64,
-                                        height: 64,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF5F5F5),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color: const Color(0xFFE0E0E0)),
-                                        ),
-                                        child: const Icon(
-                                          Icons.add,
-                                          color: AppTheme.textSecondary,
-                                          size: 28,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        '그룹 생성',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: AppTheme.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                    const SizedBox(height: 10),
+
+                    // Group Chats with + icon and collapsible
+                    Column(
+                      children: [
+                        const Divider(
+                            height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _isGroupChatExpanded = !_isGroupChatExpanded;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                            child: Row(
+                              children: [
+                                const Text(
+                                  '그룹채팅',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
                                   ),
                                 ),
-                              ),
-                              // Existing Group Chats
-                              ..._groupChats
-                                  .map((chat) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(right: 20.0),
-                                        child: GroupChatTile(
-                                          name: chat['name']!,
-                                          image: chat['image'],
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    GroupChatScreen(
-                                                  groupName: chat['name']!,
-                                                  groupImage: chat['image'],
-                                                  members: List<String>.from(
-                                                      chat['members'] ?? []),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ))
-                                  .toList(),
-                            ],
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${_groupChats.length}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  _isGroupChatExpanded
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
+                        if (_isGroupChatExpanded)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 12),
+                            height: 120,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Create Group Button
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 20.0),
+                                    child: GestureDetector(
+                                      onTap: () async {
+                                        final result = await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CreateGroupScreen(),
+                                          ),
+                                        );
+
+                                        if (result != null &&
+                                            result is Map<String, dynamic>) {
+                                          setState(() {
+                                            _groupChats.insert(0, result);
+                                          });
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text(
+                                                    '그룹 "${result['name']}" 생성 완료!')),
+                                          );
+                                        }
+                                      },
+                                      child: Column(
+                                        children: [
+                                          Container(
+                                            width: 64,
+                                            height: 64,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF5F5F5),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                  color: const Color(0xFFE0E0E0)),
+                                            ),
+                                            child: const Icon(
+                                              Icons.add,
+                                              color: AppTheme.textSecondary,
+                                              size: 28,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            '그룹 생성',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppTheme.textPrimary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Existing Group Chats
+                                  ..._groupChats
+                                      .map((chat) => Padding(
+                                            padding:
+                                                const EdgeInsets.only(right: 20.0),
+                                            child: GroupChatTile(
+                                              name: chat['name']!,
+                                              image: chat['image'],
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                        GroupChatScreen(
+                                                      groupName: chat['name']!,
+                                                      groupImage: chat['image'],
+                                                      members: List<String>.from(
+                                                          chat['members'] ?? []),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ))
+                                      .toList(),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    // Favorites
+                    if (favorites.isNotEmpty)
+                      CollapsibleSection(
+                        title: '즐겨찾기',
+                        count: favorites.length,
+                        child: Column(
+                          children: favorites
+                              .map((f) => FriendTile(
+                                    friend: f,
+                                    onTap: () => _navigateToProfile(f),
+                                    onFavoriteToggle: () => setState(() =>
+                                        _dataManager.toggleFavorite(f['name'])),
+                                  ))
+                              .toList(),
+                        ),
                       ),
+
+                    // Friend Requests
+                    if (_dataManager.friendRequests.isNotEmpty)
+                      CollapsibleSection(
+                        title: '친구 요청',
+                        count: _dataManager.friendRequests.length,
+                        child: Column(
+                          children: _dataManager.friendRequests
+                              .asMap()
+                              .entries
+                              .map((entry) {
+                            final index = entry.key;
+                            final request = entry.value;
+                            return FriendRequestTile(
+                              request: request,
+                              onAccept: () {
+                                setState(() {
+                                  _dataManager.acceptFriendRequest(index);
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content:
+                                          Text('${request['name']}님을 친구로 추가했습니다')),
+                                );
+                              },
+                              onDecline: () {
+                                setState(() {
+                                  _dataManager.removeFriendRequest(index);
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text(
+                                          '${request['name']}님의 친구 요청을 거절했습니다')),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                    // Birthdays
+                    if (birthdays.isNotEmpty)
+                      CollapsibleSection(
+                        title: '생일인 친구',
+                        count: birthdays.length,
+                        child: Column(
+                          children: birthdays
+                              .map((f) => FriendTile(
+                                    friend: f,
+                                    onTap: () => _navigateToProfile(f),
+                                    onFavoriteToggle: () => setState(() =>
+                                        _dataManager.toggleFavorite(f['name'])),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+
+                    // Friends List
+                    CollapsibleSection(
+                      title: '친구 목록',
+                      count: otherFriends.length,
+                      child: Column(
+                        children: otherFriends
+                            .map((f) => FriendTile(
+                                  friend: f,
+                                  onTap: () => _navigateToProfile(f),
+                                  onFavoriteToggle: () => setState(() =>
+                                      _dataManager.toggleFavorite(f['name'])),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
                   ],
                 ),
-
-                // Favorites
-                if (favorites.isNotEmpty)
-                  CollapsibleSection(
-                    title: '즐겨찾기',
-                    count: favorites.length,
-                    child: Column(
-                      children: favorites
-                          .map((f) => FriendTile(
-                                friend: f,
-                                onTap: () => _navigateToProfile(f),
-                                onFavoriteToggle: () => setState(() =>
-                                    _dataManager.toggleFavorite(f['name'])),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-
-                // Friend Requests
-                if (_dataManager.friendRequests.isNotEmpty)
-                  CollapsibleSection(
-                    title: '친구 요청',
-                    count: _dataManager.friendRequests.length,
-                    child: Column(
-                      children: _dataManager.friendRequests
-                          .asMap()
-                          .entries
-                          .map((entry) {
-                        final index = entry.key;
-                        final request = entry.value;
-                        return FriendRequestTile(
-                          request: request,
-                          onAccept: () {
-                            setState(() {
-                              _dataManager.acceptFriendRequest(index);
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content:
-                                      Text('${request['name']}님을 친구로 추가했습니다')),
-                            );
-                          },
-                          onDecline: () {
-                            setState(() {
-                              _dataManager.removeFriendRequest(index);
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      '${request['name']}님의 친구 요청을 거절했습니다')),
-                            );
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-
-                // Birthdays
-                if (birthdays.isNotEmpty)
-                  CollapsibleSection(
-                    title: '생일인 친구',
-                    count: birthdays.length,
-                    child: Column(
-                      children: birthdays
-                          .map((f) => FriendTile(
-                                friend: f,
-                                onTap: () => _navigateToProfile(f),
-                                onFavoriteToggle: () => setState(() =>
-                                    _dataManager.toggleFavorite(f['name'])),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-
-                // Friends List
-                CollapsibleSection(
-                  title: '친구 목록',
-                  count: otherFriends.length,
-                  child: Column(
-                    children: otherFriends
-                        .map((f) => FriendTile(
-                              friend: f,
-                              onTap: () => _navigateToProfile(f),
-                              onFavoriteToggle: () => setState(() =>
-                                  _dataManager.toggleFavorite(f['name'])),
-                            ))
-                        .toList(),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -680,68 +711,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildProfileHeader(Map<String, dynamic> user) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.only(top: 20, bottom: 20),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProfileScreen(user: user),
-              ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFAAAAAA),
-                    shape: BoxShape.circle,
-                    image: user['image'] != null
-                        ? DecorationImage(
-                            image: NetworkImage(user['image']),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: user['image'] == null
-                      ? Center(
-                          child: Text(user['avatar'] ?? '',
-                              style: const TextStyle(fontSize: 30)),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfileScreen(user: user),
+            ),
+          );
+        },
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
+          child: Row(
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFAAAAAA),
+                  shape: BoxShape.circle,
+                  image: user['image'] != null
+                      ? DecorationImage(
+                          image: NetworkImage(user['image']),
+                          fit: BoxFit.cover,
                         )
                       : null,
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user['name'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
+                child: user['image'] == null
+                    ? Center(
+                        child: Text(user['avatar'] ?? '',
+                            style: const TextStyle(fontSize: 30)),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user['name'] ?? '',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user['statusMessage'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppTheme.textSecondary,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user['statusMessage'] ?? '',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSecondary,
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -770,7 +798,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(vertical: 10),
+            contentPadding: EdgeInsets.symmetric(vertical: 14),
             fillColor: Colors.transparent,
             hoverColor: Colors.transparent,
           ),

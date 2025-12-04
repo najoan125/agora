@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import 'invite_user_screen.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +9,8 @@ import 'dart:typed_data';
 import 'dart:async';
 import '../../../core/utils/file_download_helper.dart';
 import '../widgets/voice_recorder_dialog.dart';
+import '../models/chat_message.dart';
+import '../widgets/message_bubble.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'media_gallery_screen.dart';
 
@@ -723,6 +725,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     itemBuilder: (context, index) {
                       final message = _searchResults[index];
                       return MessageBubble(
+                        key: ValueKey('${message.time}_${message.text}'),
                         message: message.text,
                         isMe: message.isMe,
                         time: message.time,
@@ -738,6 +741,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         filesList: message.filesList,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
+                        reactions: message.reactions,
+                        onReactionSelected: (emoji) {
+                          setState(() {
+                            if (index >= 0 && index < _searchResults.length) {
+                              final updatedMessage = _searchResults[index].copyWith(
+                                reactions: List.from(_searchResults[index].reactions)..add(emoji),
+                              );
+                              _searchResults[index] = updatedMessage;
+                              
+                              final originalIndex = _messages.indexWhere((m) => m.time == message.time && m.text == message.text);
+                              if (originalIndex != -1) {
+                                _messages[originalIndex] = updatedMessage;
+                              }
+                            }
+                          });
+                        },
                       );
                     },
                   )
@@ -750,6 +769,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     itemBuilder: (context, index) {
                       final message = _messages[index];
                       return MessageBubble(
+                        key: ValueKey('${message.time}_${message.text}'),
                         message: message.text,
                         isMe: message.isMe,
                         time: message.time,
@@ -765,6 +785,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         filesList: message.filesList,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
+                        reactions: message.reactions,
+                        onReactionSelected: (emoji) {
+                          setState(() {
+                            if (index >= 0 && index < _messages.length) {
+                              final updatedMessage = _messages[index].copyWith(
+                                reactions: List.from(_messages[index].reactions)..add(emoji),
+                              );
+                              _messages[index] = updatedMessage;
+                            }
+                          });
+                        },
                       );
                     },
                   ),
@@ -1378,669 +1409,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class ChatMessage {
-  final String text;
-  final bool isMe;
-  final DateTime time;
-  final Uint8List? imageBytes; // Single image (backward compatibility)
-  final List<Uint8List>? imageBytesList; // Multiple images
-  final String? imageUrl;
-  final String? fileName; // Single file (backward compatibility)
-  final int? fileSize; // Single file (backward compatibility)
-  final String? filePath; // Single file (backward compatibility)
-  final Uint8List? fileBytes; // Single file (backward compatibility)
-  final List<Map<String, dynamic>>? filesList; // Multiple files
-  final String? audioPath;
-  final Duration? audioDuration;
-
-  ChatMessage({
-    required this.text,
-    required this.isMe,
-    required this.time,
-    this.imageBytes,
-    this.imageBytesList,
-    this.imageUrl,
-    this.fileName,
-    this.fileSize,
-    this.filePath,
-    this.fileBytes,
-    this.filesList,
-    this.audioPath,
-    this.audioDuration,
-  });
-}
-
-class MessageBubble extends StatefulWidget {
-  final String message;
-  final bool isMe;
-  final DateTime time;
-  final String? userImage;
-  final String senderName;
-  final Uint8List? imageBytes; // Single image (backward compatibility)
-  final List<Uint8List>? imageBytesList; // Multiple images
-  final String? imageUrl;
-  final String? fileName; // Single file (backward compatibility)
-  final int? fileSize; // Single file (backward compatibility)
-  final String? filePath; // Single file (backward compatibility)
-  final Uint8List? fileBytes; // Single file (backward compatibility)
-  final List<Map<String, dynamic>>? filesList; // Multiple files
-  final String? audioPath;
-  final Duration? audioDuration;
-
-  const MessageBubble({
-    Key? key,
-    required this.message,
-    required this.isMe,
-    required this.time,
-    this.userImage,
-    required this.senderName,
-    this.imageBytes,
-    this.imageBytesList,
-    this.imageUrl,
-    this.fileName,
-    this.fileSize,
-    this.filePath,
-    this.fileBytes,
-    this.filesList,
-    this.audioPath,
-    this.audioDuration,
-  }) : super(key: key);
-
-  @override
-  State<MessageBubble> createState() => _MessageBubbleState();
-}
-
-class _MessageBubbleState extends State<MessageBubble> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
-  Timer? _positionTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.audioPath != null) {
-      print('🎵 MessageBubble init: audioPath=${widget.audioPath}, audioDuration=${widget.audioDuration}');
-      
-      // Set initial duration from widget
-      if (widget.audioDuration != null) {
-        setState(() {
-          _totalDuration = widget.audioDuration!;
-        });
-        print('⏱️ Initial duration set: ${widget.audioDuration}');
-      }
-      
-      _audioPlayer.onPlayerStateChanged.listen((state) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = state == PlayerState.playing;
-          });
-        }
-      });
-
-      _audioPlayer.onDurationChanged.listen((duration) {
-        if (mounted) {
-          print('⏱️ Duration changed: $duration');
-          // 0초로 변경되는 경우, 기존에 유효한 시간이 있다면 무시
-          if (duration == Duration.zero && _totalDuration > Duration.zero) {
-            print('⚠️ Ignoring zero duration update as we have valid duration: $_totalDuration');
-            return;
-          }
-          setState(() {
-            _totalDuration = duration;
-          });
-        }
-      });
-
-      _audioPlayer.onPositionChanged.listen((position) {
-        if (mounted) {
-          setState(() {
-            _currentPosition = position;
-          });
-        }
-      });
-
-      _audioPlayer.onPlayerComplete.listen((event) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = false;
-            _currentPosition = Duration.zero;
-          });
-        }
-      });
-
-      // Load audio source to get actual duration
-      _loadAudioDuration();
-    }
-  }
-
-  Future<void> _loadAudioDuration() async {
-    try {
-      print('📂 Loading audio file: ${widget.audioPath}');
-      
-      // Web에서는 blob URL을 사용하므로 setSourceUrl 사용
-      if (widget.audioPath!.startsWith('blob:')) {
-        print('🌐 Using setSourceUrl for blob URL');
-        await _audioPlayer.setSourceUrl(widget.audioPath!);
-      } else {
-        print('📱 Using setSourceDeviceFile for file path');
-        await _audioPlayer.setSourceDeviceFile(widget.audioPath!);
-      }
-      
-      print('✅ Audio file loaded successfully');
-      // Duration will be set via onDurationChanged listener
-    } catch (e) {
-      print('❌ Error loading audio duration: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _positionTimer?.cancel();
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
-  }
-
-  Future<void> _playPause() async {
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-      _positionTimer?.cancel();
-      setState(() {
-        _isPlaying = false;
-      });
-    } else {
-      // Web에서는 blob URL을 사용하므로 UrlSource 사용
-      if (widget.audioPath!.startsWith('blob:')) {
-        await _audioPlayer.play(UrlSource(widget.audioPath!));
-      } else {
-        await _audioPlayer.play(DeviceFileSource(widget.audioPath!));
-      }
-      
-      setState(() {
-        _isPlaying = true;
-      });
-      
-      // Web에서 position 업데이트를 위한 타이머
-      _positionTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
-        if (mounted && _isPlaying) {
-          final position = await _audioPlayer.getCurrentPosition();
-          final duration = await _audioPlayer.getDuration();
-          
-          if (mounted) {
-            setState(() {
-              if (position != null) _currentPosition = position;
-              if (duration != null && duration > Duration.zero) _totalDuration = duration;
-            });
-          }
-          
-          // 재생 완료 체크
-          if (position != null && duration != null && position >= duration) {
-            timer.cancel();
-            if (mounted) {
-              setState(() {
-                _isPlaying = false;
-                _currentPosition = Duration.zero;
-              });
-            }
-          }
-        }
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment:
-            widget.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!widget.isMe) ...[
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                shape: BoxShape.circle,
-                image: widget.userImage != null && widget.userImage!.isNotEmpty
-                    ? DecorationImage(
-                        image: NetworkImage(widget.userImage!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: widget.userImage == null || widget.userImage!.isEmpty
-                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                  : null,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Column(
-            crossAxisAlignment:
-                widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!widget.isMe) ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    widget.senderName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (widget.isMe) ...[ 
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Text(
-                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                  // 미디어 콘텐츠와 텍스트를 Column으로 분리
-                  Column(
-                    crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                    children: [
-                      // 이미지 표시 (말풍선 밖)
-                      if (widget.imageBytes != null || (widget.imageBytesList != null && widget.imageBytesList!.isNotEmpty)) ...[
-                        Builder(
-                          builder: (context) {
-                            final images = widget.imageBytesList ?? [widget.imageBytes!];
-                            
-                            if (images.length == 1) {
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => Scaffold(
-                                        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-                                        backgroundColor: Colors.black,
-                                        body: Center(
-                                          child: Image.memory(images[0]),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 240,
-                                      maxHeight: 320,
-                                    ),
-                                    child: Image.memory(
-                                      images[0],
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            // Grid layout for multiple images
-                            return SizedBox(
-                              width: 240,
-                              child: Wrap(
-                                spacing: 4,
-                                runSpacing: 4,
-                                children: List.generate(images.length, (index) {
-                                  // Calculate size based on image count
-                                  double size;
-                                  if (images.length == 2 || images.length == 4) {
-                                    size = (240 - 4) / 2; // 2 columns
-                                  } else {
-                                    size = (240 - 8) / 3; // 3 columns
-                                  }
-
-                                  return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => Scaffold(
-                                            appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-                                            backgroundColor: Colors.black,
-                                            body: PageView.builder(
-                                              controller: PageController(initialPage: index),
-                                              itemCount: images.length,
-                                              itemBuilder: (context, pageIndex) {
-                                                return Center(
-                                                  child: Image.memory(
-                                                    images[pageIndex],
-                                                    errorBuilder: (context, error, stackTrace) {
-                                                      print('❌ Error displaying full screen image: $error');
-                                                      return const Icon(Icons.error, color: Colors.white);
-                                                    },
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        images[index],
-                                        width: size,
-                                        height: size,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          print('❌ Error displaying grid image: $error');
-                                          return Container(
-                                            width: size,
-                                            height: size,
-                                            color: Colors.grey[300],
-                                            child: const Icon(Icons.broken_image, color: Colors.grey),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            );
-                          },
-                        ),
-                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
-                      ],
-                      // 파일 표시 (말풍선 밖)
-                      // Multiple files support
-                      if (widget.filesList != null && widget.filesList!.isNotEmpty) ...[
-                        ...widget.filesList!.map((fileData) {
-                          final fileName = fileData['name'] as String?;
-                          final fileSize = fileData['size'] as int?;
-                          final fileBytes = fileData['bytes'] as Uint8List?;
-                          
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 4.0),
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: widget.isMe
-                                    ? const Color(0xFF0095F6)
-                                    : const Color(0xFFF0F0F0),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.insert_drive_file,
-                                    color: widget.isMe ? Colors.white : Colors.blue,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (fileName != null)
-                                        Text(
-                                          fileName,
-                                          style: TextStyle(
-                                            color: widget.isMe ? Colors.white : Colors.black,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      if (fileSize != null)
-                                        Text(
-                                          '${(fileSize / 1024).toStringAsFixed(1)} KB',
-                                          style: TextStyle(
-                                            color: widget.isMe
-                                                ? Colors.white.withValues(alpha: 0.8)
-                                                : Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  if (fileBytes != null && fileName != null) ...[ 
-                                    const SizedBox(width: 12),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.download,
-                                        color: widget.isMe ? Colors.white : Colors.blue,
-                                        size: 24,
-                                      ),
-                                      onPressed: () async {
-                                        await FileDownloadHelper.downloadFile(
-                                          fileBytes: fileBytes,
-                                          fileName: fileName,
-                                        );
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('$fileName 다운로드 완료'),
-                                              duration: const Duration(seconds: 2),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
-                      ]
-                      // Single file (backward compatibility)
-                      else if (widget.fileName != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: widget.isMe
-                                ? const Color(0xFF0095F6)
-                                : const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.insert_drive_file,
-                                color: widget.isMe ? Colors.white : Colors.blue,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.fileName!,
-                                    style: TextStyle(
-                                      color: widget.isMe ? Colors.white : Colors.black,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  if (widget.fileSize != null)
-                                    Text(
-                                      '${(widget.fileSize! / 1024).toStringAsFixed(1)} KB',
-                                      style: TextStyle(
-                                        color: widget.isMe
-                                            ? Colors.white.withValues(alpha: 0.8)
-                                            : Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              if (widget.fileBytes != null) ...[
-                                const SizedBox(width: 12),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.download,
-                                    color: widget.isMe ? Colors.white : Colors.blue,
-                                    size: 24,
-                                  ),
-                                  onPressed: () async {
-                                    if (widget.fileBytes != null && widget.fileName != null) {
-                                      await FileDownloadHelper.downloadFile(
-                                        fileBytes: widget.fileBytes!,
-                                        fileName: widget.fileName!,
-                                      );
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('${widget.fileName} 다운로드 완료'),
-                                            duration: const Duration(seconds: 2),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        if (widget.message.isNotEmpty) const SizedBox(height: 8),
-                      ],
-                      // 오디오 플레이어 (말풍선 밖)
-                      if (widget.audioPath != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: widget.isMe
-                                ? const Color(0xFF0095F6)
-                                : const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: widget.isMe ? Colors.white : Colors.purple,
-                                  size: 28,
-                                ),
-                                onPressed: _playPause,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '음성 메모',
-                                    style: TextStyle(
-                                      color: widget.isMe ? Colors.white : Colors.black,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  SizedBox(
-                                    width: 150,
-                                    child: LinearProgressIndicator(
-                                      value: (_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration).inMilliseconds > 0
-                                          ? (_currentPosition.inMilliseconds / (_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration).inMilliseconds).clamp(0.0, 1.0)
-                                          : 0.0,
-                                      backgroundColor: widget.isMe ? Colors.white.withValues(alpha: 0.3) : Colors.grey[300],
-                                      valueColor: AlwaysStoppedAnimation<Color>(widget.isMe ? Colors.white : Colors.purple),
-                                      minHeight: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_formatDuration(_currentPosition)} / ${_formatDuration(_totalDuration == Duration.zero && widget.audioDuration != null ? widget.audioDuration! : _totalDuration)}',
-                                    style: TextStyle(
-                                      color: widget.isMe
-                                          ? Colors.white.withValues(alpha: 0.8)
-                                          : Colors.grey[600],
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (widget.message.isNotEmpty && widget.message != '음성 메모')
-                          const SizedBox(height: 8),
-                      ],
-                      // 텍스트 메시지 (말풍선 안)
-                      if (widget.message.isNotEmpty &&
-                          (widget.audioPath == null || widget.message != '음성 메모'))
-                        Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.7,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: widget.isMe
-                                ? const Color(0xFF0095F6)
-                                : const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(20),
-                              topRight: const Radius.circular(20),
-                              bottomLeft: Radius.circular(widget.isMe ? 20 : 4),
-                              bottomRight: Radius.circular(widget.isMe ? 4 : 20),
-                            ),
-                          ),
-                          child: Text(
-                            widget.message,
-                            style: TextStyle(
-                              color: widget.isMe ? Colors.white : Colors.black,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (!widget.isMe) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

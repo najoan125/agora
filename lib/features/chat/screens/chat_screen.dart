@@ -117,24 +117,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 16),
             ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(48),
-              child: Container(
-                color: Colors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: Colors.black,
-                  unselectedLabelColor: const Color(0xFF8E8E93),
-                  indicatorColor: Colors.black,
-                  indicatorWeight: 1.7,
-                  labelPadding: EdgeInsets.zero,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  tabs: [
-                    _buildTab('친구', 0),
-                    _buildTab('팀원', 1),
-                  ],
-                ),
-              ),
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: AppTheme.textPrimary,
+              unselectedLabelColor: AppTheme.textSecondary,
+              indicatorColor: AppTheme.textPrimary,
+              indicatorWeight: 2,
+              indicatorSize: TabBarIndicatorSize.tab,
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              tabs: const [
+                Tab(text: '친구'),
+                Tab(text: '팀원'),
+              ],
             ),
           ),
           body: GestureDetector(
@@ -364,24 +359,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTab(String text, int index) {
-    // Check if this tab is selected
-    final bool isSelected = _tabController.index == index;
-    return Tab(
-      height: 48,
-      child: Container(
-        color: isSelected ? const Color(0xFFEBF5FF) : Colors.white, // Light blue for selected
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildFilterChip({
     required String label,

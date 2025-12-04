@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'https://api.hyfata.kr/';
   
   // 안드로이드 에뮬레이터: http://10.0.2.2:8080
   // 웹 브라우저: http://localhost:8080
@@ -38,6 +38,14 @@ class ApiClient {
           if (error.response?.statusCode == 401 || 
               error.response?.statusCode == 403) {
             
+            // 무한 루프 방지: 이미 재시도한 요청인지 확인
+            final retryCount = error.requestOptions.extra['retry_count'] ?? 0;
+            if (retryCount >= 1) {
+              print('❌ Already retried once, stopping to prevent infinite loop');
+              await _clearTokens();
+              return handler.next(error);
+            }
+            
             print('🔒 Token expired (${error.response?.statusCode}), refreshing...');
             final refreshed = await _refreshToken();
             
@@ -48,9 +56,10 @@ class ApiClient {
               final options = error.requestOptions;
               final token = await _getAccessToken();
               options.headers['Authorization'] = 'Bearer $token';
+              options.extra['retry_count'] = retryCount + 1;
               
               try {
-                print('🔄 Retrying original request...');
+                print('🔄 Retrying original request (attempt ${retryCount + 1})...');
                 final response = await dio.fetch(options);
                 return handler.resolve(response);
               } catch (e) {
@@ -146,7 +155,11 @@ class ApiClient {
 
   /// PUT 요청
   Future<Response> put(String path, {dynamic data}) async {
-    return await dio.put(path, data: data);
+    print('🌐 [ApiClient] PUT 요청: $baseUrl$path');
+    print('📤 [ApiClient] 요청 데이터: $data');
+    final response = await dio.put(path, data: data);
+    print('📥 [ApiClient] 응답 상태: ${response.statusCode}');
+    return response;
   }
 
   /// DELETE 요청

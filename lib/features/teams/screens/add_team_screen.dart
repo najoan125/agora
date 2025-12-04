@@ -1,5 +1,7 @@
-// 새로운 팀 생성 화면
+import 'dart:io';
+import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'add_team_member_screen.dart';
 
 class AddTeamScreen extends StatefulWidget {
@@ -17,19 +19,26 @@ class AddTeamScreen extends StatefulWidget {
 class _AddTeamScreenState extends State<AddTeamScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _teamDescriptionController;
-  String _selectedImage = 'https://picsum.photos/id/1005/200/200';
+  
+  // Image selection
+  final ImagePicker _picker = ImagePicker();
+  XFile? _pickedFile;
+  String? _selectedImage; // No default image
+  
+  // Icon selection
+  String _selectedIcon = '🛡️';
+  final List<String> _availableIcons = [
+    '🛡️', '🚀', '💼', '🎓', '⚽', '✈️', '🎵', '🍔', 
+    '💻', '🎨', '🏥', '🏗️', '🎬', '🎮', '📷', '💡',
+    '🔥', '💧', '🌱', '⚡', '⭐', '❤️', '🤝', '📢'
+  ];
+
+  // Mode: true = Image, false = Icon
+  bool _isImageMode = true;
+
   final List<Map<String, dynamic>> _selectedMembers = [];
 
-  final List<String> _availableImages = [
-    'https://picsum.photos/id/1005/200/200',
-    'https://picsum.photos/id/1011/200/200',
-    'https://picsum.photos/id/1027/200/200',
-    'https://picsum.photos/id/1012/200/200',
-    'https://picsum.photos/id/1035/200/200',
-    'https://picsum.photos/id/1040/200/200',
-    'https://picsum.photos/id/1050/200/200',
-    'https://picsum.photos/id/1060/200/200',
-  ];
+
 
   @override
   void initState() {
@@ -45,6 +54,16 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _pickedFile = image;
+        _selectedImage = image.path; // Update selected image path
+      });
+    }
+  }
+
   void _addTeam() {
     if (_teamNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,9 +75,10 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
     final newTeam = {
       'name': _teamNameController.text,
       'member': '${_selectedMembers.length}명',
-      'icon': '🛡️',
-      'image': _selectedImage,
+      'icon': _isImageMode ? null : _selectedIcon,
+      'image': _isImageMode ? (_pickedFile?.path ?? _selectedImage) : null,
       'members': _selectedMembers.map((m) => m['name']).toList(),
+      'description': _teamDescriptionController.text,
     };
 
     widget.onTeamAdded(newTeam);
@@ -74,6 +94,10 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('팀 만들기'),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -84,109 +108,210 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 팀 이미지 선택
-            Text(
-              '팀 이미지 선택',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+            // Type Selection (Image vs Icon)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('이미지 선택'),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isImageMode = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _isImageMode ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _isImageMode
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
                         ),
-                        itemCount: _availableImages.length,
-                        itemBuilder: (context, index) {
-                          final image = _availableImages[index];
-                          final isSelected = _selectedImage == image;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedImage = image;
-                              });
-                              Navigator.pop(context);
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.blue.shade400
-                                      : Colors.transparent,
-                                  width: 3,
-                                ),
-                                image: DecorationImage(
-                                  image: NetworkImage(image),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                        child: const Center(
+                          child: Text(
+                            '이미지',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.grey.shade50,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              image: NetworkImage(_selectedImage),
-                              fit: BoxFit.cover,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isImageMode = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: !_isImageMode ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: !_isImageMode
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: const Center(
+                          child: Text(
+                            '아이콘',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '이미지 변경',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    Icon(
-                      Icons.arrow_drop_down,
-                      color: Colors.grey.shade600,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
+
+            // Selection Area
+            if (_isImageMode) ...[
+              // Image Selection Mode (Center-aligned)
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: _pickedFile != null
+                          ? (kIsWeb
+                              ? Image.network(
+                                  _pickedFile!.path,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.error_outline,
+                                          color: Colors.red),
+                                    );
+                                  },
+                                )
+                              : Image.file(
+                                  File(_pickedFile!.path),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.error_outline,
+                                          color: Colors.red),
+                                    );
+                                  },
+                                ))
+                          : (_selectedImage != null && _selectedImage!.startsWith('http')
+                              ? Image.network(
+                                  _selectedImage!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.error_outline,
+                                          color: Colors.red),
+                                    );
+                                  },
+                                )
+                              : Center(
+                                  child: Icon(Icons.add_photo_alternate,
+                                      size: 40, color: Colors.grey.shade400),
+                                )),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: _pickImage,
+                  child: Text(
+                    _pickedFile != null || (_selectedImage != null && _selectedImage!.startsWith('http'))
+                        ? '이미지 변경'
+                        : '이미지 선택',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+            ] else ...[
+              // Icon Selection Mode
+              Center(
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      _selectedIcon,
+                      style: const TextStyle(fontSize: 50),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: _availableIcons.length,
+                itemBuilder: (context, index) {
+                  final icon = _availableIcons[index];
+                  final isSelected = _selectedIcon == icon;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedIcon = icon),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue.shade100 : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          icon,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+
+            const SizedBox(height: 32),
+            
             // 팀 이름 입력
             Text(
               '팀 이름',
@@ -327,16 +452,18 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => AddTeamMemberScreen(
-                            onMemberAdded: (member) {
+                            onMembersAdded: (members) {
                               setState(() {
-                                if (!_selectedMembers
-                                    .any((m) => m['id'] == member['id'])) {
-                                  _selectedMembers.add(member);
+                                for (var member in members) {
+                                  if (!_selectedMembers
+                                      .any((m) => m['id'] == member['id'])) {
+                                    _selectedMembers.add(member);
+                                  }
                                 }
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('${member['name']}을(를) 추가했습니다'),
+                                  content: Text('${members.length}명을 추가했습니다'),
                                 ),
                               );
                             },

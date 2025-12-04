@@ -102,14 +102,21 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddTeamMemberScreen(
-          onMemberAdded: (member) {
+          onMembersAdded: (members) {
             setState(() {
-              final memberName = member['name'] as String;
-              if (!_members.contains(memberName)) {
-                _members.add(memberName);
-                _refreshRoles();
+              for (var member in members) {
+                final memberName = member['name'] as String;
+                if (!_members.contains(memberName)) {
+                  _members.add(memberName);
+                }
               }
+              _refreshRoles();
             });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${members.length}명을 팀원으로 추가했습니다'),
+              ),
+            );
           },
         ),
       ),
