@@ -27,6 +27,7 @@ dependencies:
   url_launcher: ^6.3.2
   open_file: ^3.5.10
   audioplayers: ^6.5.1
+  http_parser: ^4.0.2
 
 dev_dependencies:
   flutter_test:

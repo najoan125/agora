@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:agora/core/theme.dart';
 import 'package:agora/features/chat/screens/select_members_screen.dart';
 
@@ -12,11 +14,22 @@ class CreateGroupScreen extends StatefulWidget {
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final TextEditingController _nameController = TextEditingController();
   List<String> _selectedMembers = [];
+  File? _groupImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _groupImage = File(image.path);
+      });
+    }
   }
 
   Future<void> _selectMembers() async {
@@ -52,7 +65,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     // Create group data
     final newGroup = {
       'name': _nameController.text,
-      'image': 'https://picsum.photos/seed/${_nameController.text.hashCode.abs()}/200/200',
+      'image': _groupImage?.path ?? 'https://picsum.photos/seed/${_nameController.text.hashCode.abs()}/200/200',
+      'isLocalImage': _groupImage != null,
       'info': '${_selectedMembers.length}명',
       'members': _selectedMembers,
     };
@@ -91,6 +105,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(35), // Squircle-ish
+                ),
+                child: _groupImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(35),
+                        child: Image.file(
+                          _groupImage!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: AppTheme.textSecondary,
+                          size: 30,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
             const Text(
               'group name',
               style: TextStyle(
@@ -100,26 +141,23 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: Container(
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF5F5F5),
+                ),
+                child: TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    hintText: '그룹 이름을 입력하세요',
+                    hintStyle: TextStyle(color: AppTheme.textSecondary),
                   ),
-                ],
-              ),
-              child: TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  hintText: '그룹 이름을 입력하세요',
-                  hintStyle: TextStyle(color: Color(0xFFCCCCCC)),
                 ),
               ),
             ),
@@ -137,11 +175,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               onTap: _selectMembers,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                height: 52,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                  borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.1),

@@ -153,14 +153,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => EditProfileScreen(user: widget.user),
+                  builder: (context) => const EditProfileScreen(),
                 ),
               );
               if (result == true) {
                 setState(() {
-                  // Refresh data if needed, though DataManager update should reflect if we rebuild or re-fetch
-                  // Since widget.user is passed by reference/value, we might need to update it or rely on parent rebuild.
-                  // For now, let's assume DataManager update is enough if we re-read or if widget.user is a reference to the map in DataManager.
+                  // 프로필이 업데이트되었으므로 화면 새로고침
                 });
               }
             },

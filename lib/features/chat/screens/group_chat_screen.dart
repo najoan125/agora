@@ -1,4 +1,4 @@
-// 그룹 채팅 대화 화면
+﻿// 그룹 채팅 대화 화면
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import 'invite_user_screen.dart';
@@ -14,6 +14,8 @@ import 'dart:io';
 import '../../../core/utils/file_download_helper.dart';
 import '../widgets/voice_recorder_dialog.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../models/chat_message.dart';
+import '../widgets/message_bubble.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupName;
@@ -57,6 +59,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           isMe: false,
           time: DateTime.now().subtract(const Duration(minutes: 30)),
           sender: '김철수',
+          userImage: 'https://picsum.photos/id/64/200/200',
         ),
       ];
       return;
@@ -68,18 +71,21 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         isMe: false,
         time: DateTime.now().subtract(const Duration(minutes: 30)),
         sender: members[0 % members.length],
+        userImage: 'https://picsum.photos/id/64/200/200',
       ),
       ChatMessage(
         text: '오늘 모임 시간 확정됐나요?',
         isMe: false,
         time: DateTime.now().subtract(const Duration(minutes: 25)),
         sender: members[1 % members.length],
+        userImage: 'https://picsum.photos/id/91/200/200',
       ),
       ChatMessage(
         text: '오후 3시로 정했어요!',
         isMe: false,
         time: DateTime.now().subtract(const Duration(minutes: 20)),
         sender: members[2 % members.length],
+        userImage: 'https://picsum.photos/id/103/200/200',
       ),
     ];
   }
@@ -134,6 +140,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 time: DateTime.now(),
                 sender: widget.members[
                     DateTime.now().millisecond % widget.members.length],
+                userImage: 'https://picsum.photos/id/${(DateTime.now().millisecond % 50) + 50}/200/200',
               ),
             );
           });
@@ -597,11 +604,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     itemCount: _searchResults.length,
                     itemBuilder: (context, index) {
                       final message = _searchResults[index];
-                      return GroupMessageBubble(
+                      return MessageBubble(
+                        key: ValueKey('${message.time}_${message.text}'),
                         message: message.text,
                         isMe: message.isMe,
                         time: message.time,
-                        sender: message.sender,
+                        senderName: message.sender,
+                        userImage: message.userImage ?? message.avatar,
                         onDelete: _deleteMessage,
                         onReply: _handleReply,
                         onForward: _handleForward,
@@ -614,6 +623,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                         fileBytes: message.fileBytes,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
+                        reactions: message.reactions,
+                        onReactionSelected: (emoji) {
+                          setState(() {
+                            if (index >= 0 && index < _searchResults.length) {
+                              final updatedMessage = _searchResults[index].copyWith(
+                                reactions: List.from(_searchResults[index].reactions)..add(emoji),
+                              );
+                              _searchResults[index] = updatedMessage;
+                              
+                              final originalIndex = _messages.indexWhere((m) => m.time == message.time && m.text == message.text);
+                              if (originalIndex != -1) {
+                                _messages[originalIndex] = updatedMessage;
+                              }
+                            }
+                          });
+                        },
                       );
                     },
                   )
@@ -625,11 +650,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
-                      return GroupMessageBubble(
+                      return MessageBubble(
+                        key: ValueKey('${message.time}_${message.text}'),
                         message: message.text,
                         isMe: message.isMe,
                         time: message.time,
-                        sender: message.sender,
+                        senderName: message.sender,
+                        userImage: message.userImage ?? message.avatar,
                         onDelete: _deleteMessage,
                         onReply: _handleReply,
                         onForward: _handleForward,
@@ -642,6 +669,17 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                         fileBytes: message.fileBytes,
                         audioPath: message.audioPath,
                         audioDuration: message.audioDuration,
+                        reactions: message.reactions,
+                        onReactionSelected: (emoji) {
+                          setState(() {
+                            if (index >= 0 && index < _messages.length) {
+                              final updatedMessage = _messages[index].copyWith(
+                                reactions: List.from(_messages[index].reactions)..add(emoji),
+                              );
+                              _messages[index] = updatedMessage;
+                            }
+                          });
+                        },
                       );
                     },
                   ),
@@ -1030,542 +1068,4 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _scrollController.dispose();
     super.dispose();
 }
-}
-
-class ChatMessage {
-  final String text;
-  final bool isMe;
-  final DateTime time;
-  final String sender;
-  final Uint8List? imageBytes;
-  final String? imageUrl;
-  final String? fileName;
-  final int? fileSize;
-  final String? filePath;
-  final Uint8List? fileBytes;
-  final String? audioPath;
-  final Duration? audioDuration;
-
-  ChatMessage({
-    required this.text,
-    required this.isMe,
-    required this.time,
-    required this.sender,
-    this.imageBytes,
-    this.imageUrl,
-    this.fileName,
-    this.fileSize,
-    this.filePath,
-    this.fileBytes,
-    this.audioPath,
-    this.audioDuration,
-  });
-}
-
-class GroupMessageBubble extends StatefulWidget {
-  final String message;
-  final bool isMe;
-  final DateTime time;
-  final String sender;
-  final Uint8List? imageBytes;
-  final String? imageUrl;
-  final String? fileName;
-  final int? fileSize;
-  final String? filePath;
-  final Uint8List? fileBytes;
-  final String? audioPath;
-  final Duration? audioDuration;
-  final Function(String)? onDelete;
-  final Function(String)? onReply;
-  final Function(String)? onForward;
-  final Function(String)? onPin;
-
-  const GroupMessageBubble({
-    Key? key,
-    required this.message,
-    required this.isMe,
-    required this.time,
-    required this.sender,
-    this.imageBytes,
-    this.imageUrl,
-    this.fileName,
-    this.fileSize,
-    this.filePath,
-    this.fileBytes,
-    this.audioPath,
-    this.audioDuration,
-    this.onDelete,
-    this.onReply,
-    this.onForward,
-    this.onPin,
-  }) : super(key: key);
-
-  @override
-  State<GroupMessageBubble> createState() => _GroupMessageBubbleState();
-}
-
-class _GroupMessageBubbleState extends State<GroupMessageBubble> {
-  bool _isTranslated = false;
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-        });
-      }
-    });
-
-    _audioPlayer.onDurationChanged.listen((newDuration) {
-      if (mounted) {
-        setState(() {
-          _duration = newDuration;
-        });
-      }
-    });
-
-    _audioPlayer.onPositionChanged.listen((newPosition) {
-      if (mounted) {
-        setState(() {
-          _position = newPosition;
-        });
-      }
-    });
-    
-    _audioPlayer.onPlayerComplete.listen((event) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = false;
-          _position = Duration.zero;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$twoDigitMinutes:$twoDigitSeconds";
-  }
-
-  Future<void> _playPause() async {
-    if (widget.audioPath == null) return;
-    
-    if (_isPlaying) {
-      await _audioPlayer.pause();
-    } else {
-      await _audioPlayer.play(DeviceFileSource(widget.audioPath!));
-    }
-  }
-
-  String? _translatedText;
-
-  void _showMessageOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-            top: 20,
-            left: 16,
-            right: 16,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('👍', style: TextStyle(fontSize: 24)),
-                    Text('❤️', style: TextStyle(fontSize: 24)),
-                    Text('😂', style: TextStyle(fontSize: 24)),
-                    Text('😮', style: TextStyle(fontSize: 24)),
-                    Text('😢', style: TextStyle(fontSize: 24)),
-                    Text('😡', style: TextStyle(fontSize: 24)),
-                  ],
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.reply, color: Colors.black87),
-                      title: const Text('답장', style: TextStyle(color: Colors.black87)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        widget.onReply?.call(widget.message);
-                      },
-                    ),
-                    Divider(color: Colors.grey[200], height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.forward, color: Colors.black87),
-                      title: const Text('전달', style: TextStyle(color: Colors.black87)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        widget.onForward?.call(widget.message);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.copy, color: Colors.black87),
-                      title: const Text('복사', style: TextStyle(color: Colors.black87)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Clipboard.setData(ClipboardData(text: widget.message));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('메시지가 복사되었습니다'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    Divider(color: Colors.grey[200], height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.push_pin, color: Colors.black87),
-                      title: const Text('고정', style: TextStyle(color: Colors.black87)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        widget.onPin?.call(widget.message);
-                      },
-                    ),
-                    Divider(color: Colors.grey[200], height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.translate, color: Colors.black87),
-                      title: Text(_isTranslated ? '원문 보기' : '번역',
-                          style: const TextStyle(color: Colors.black87)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        setState(() {
-                          if (!_isTranslated) {
-                            _translatedText = '[번역됨] ${widget.message}';
-                          }
-                          _isTranslated = !_isTranslated;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.isMe && widget.onDelete != null)
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ListTile(
-                    leading: const Icon(Icons.delete, color: Colors.red),
-                    title: const Text('삭제', style: TextStyle(color: Colors.red)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showDeleteConfirmation(context);
-                    },
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('메시지 삭제'),
-        content: const Text('이 메시지를 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onDelete?.call(widget.message);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final displayMessage = _isTranslated && _translatedText != null
-        ? _translatedText!
-        : widget.message;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment:
-            widget.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!widget.isMe) ...[
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: NetworkImage(
-                    'https://picsum.photos/seed/${widget.sender.hashCode.abs()}/200/200',
-                  ),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Column(
-            crossAxisAlignment:
-                widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!widget.isMe) ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    widget.sender,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (widget.isMe) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Text(
-                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                  GestureDetector(
-                    onLongPress: () => _showMessageOptions(context),
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: widget.isMe
-                            ? const Color(0xFF0095F6)
-                            : const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(20),
-                          topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(widget.isMe ? 20 : 4),
-                          bottomRight: Radius.circular(widget.isMe ? 4 : 20),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (widget.imageBytes != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.memory(
-                                  widget.imageBytes!,
-                                  width: 200,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                          if (widget.fileName != null)
-                            GestureDetector(
-                              onTap: () {
-                                if (widget.fileBytes != null || widget.filePath != null) {
-                                  FileDownloadHelper.downloadFile(
-                                    fileBytes: widget.fileBytes ?? Uint8List(0),
-                                    fileName: widget.fileName!,
-                                    filePath: widget.filePath,
-                                  );
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue[100],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(Icons.insert_drive_file,
-                                          color: Colors.blue, size: 24),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            widget.fileName!,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (widget.fileSize != null)
-                                            Text(
-                                              '${(widget.fileSize! / 1024).toStringAsFixed(1)} KB',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          if (widget.audioPath != null)
-                            Container(
-                              width: 200,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                                    onPressed: _playPause,
-                                    color: Colors.blue,
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        LinearProgressIndicator(
-                                          value: _duration.inSeconds > 0 ? _position.inSeconds / _duration.inSeconds : 0.0,
-                                          backgroundColor: Colors.grey[300],
-                                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _formatDuration(_position),
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (widget.imageUrl != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  widget.imageUrl!,
-                                  width: 200,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                          if (displayMessage.isNotEmpty)
-                            Text(
-                              displayMessage,
-                              style: TextStyle(
-                                color: widget.isMe ? Colors.white : Colors.black,
-                                fontSize: 15,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (!widget.isMe) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        '${widget.time.hour}:${widget.time.minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }

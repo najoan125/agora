@@ -1,13 +1,33 @@
 // 앱의 진입점 및 메인 설정 파일
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui';
 import 'features/auth/login_screen.dart';
 import 'features/main/main_screen.dart';
 import 'core/theme.dart';
 import 'data/auth_service.dart';
+import 'data/api_client.dart';
+import 'data/profile_service.dart';
+import 'shared/providers/profile_provider.dart';
+import 'features/profile/screens/create_profile_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  // API Client 및 서비스 초기화
+  final apiClient = ApiClient();
+  final profileService = ProfileService(apiClient);
+
+  runApp(
+    MultiProvider(
+      providers: [
+        Provider<ApiClient>.value(value: apiClient),
+        Provider<ProfileService>.value(value: profileService),
+        ChangeNotifierProvider<ProfileProvider>(
+          create: (_) => ProfileProvider(profileService),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -42,6 +62,9 @@ class MyAppState extends State<MyApp> {
         },
       ),
       home: const SplashScreen(),  // 자동 로그인 체크 화면
+      routes: {
+        '/create-profile': (context) => const CreateProfileScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }

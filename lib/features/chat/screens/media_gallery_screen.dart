@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
-import 'conversation_screen.dart'; // For ChatMessage class
+import '../models/chat_message.dart';
 
 // Helper class to represent individual images with metadata
 class _ImageItem {

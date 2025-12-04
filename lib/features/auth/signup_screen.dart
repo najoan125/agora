@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/theme.dart';
 import '../../data/auth_service.dart';
-import 'login_screen.dart';
+
 import '../settings/screens/policy_screen.dart' show termsOfServiceContent, privacyPolicyContent, PolicyScreen;
 
 class SignupScreen extends StatefulWidget {
@@ -71,28 +71,58 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
     });
 
+    // 1. 회원가입
     final result = await _authService.register(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       username: _nameController.text.trim(),
     );
 
-    if (mounted) {
+    if (!mounted) return;
+
+    if (result['success']) {
+      print('✅ 회원가입 성공! 자동 로그인 시도 중...');
+      
+      // 2. 자동 로그인
+      final loginResult = await _authService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
       setState(() {
         _isLoading = false;
       });
 
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('계정이 성공적으로 생성되었습니다!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+      if (loginResult['success']) {
+        print('✅ 자동 로그인 성공! 프로필 생성 화면으로 이동합니다.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('계정이 생성되었습니다! Agora 프로필을 만들어주세요.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/create-profile',
+            (route) => false,
+          );
+        }
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('회원가입은 성공했으나 로그인에 실패했습니다: ${loginResult['message']}'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message']),
