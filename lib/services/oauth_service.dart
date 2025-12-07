@@ -140,6 +140,9 @@ class OAuthService {
       return;
     }
 
+    // 인앱 브라우저 닫기
+    closeInAppWebView();
+
     // 에러 확인
     final error = uri.queryParameters['error'];
     if (error != null) {
