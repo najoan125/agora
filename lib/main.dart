@@ -1,44 +1,49 @@
-// 앱의 진입점 및 메인 설정 파일
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:ui';
 import 'features/auth/login_screen.dart';
 import 'features/main/main_screen.dart';
 import 'core/theme.dart';
-import 'data/auth_service.dart';
-import 'data/api_client.dart';
-import 'data/profile_service.dart';
-import 'shared/providers/profile_provider.dart';
+import 'shared/providers/auth_provider.dart';
+import 'shared/providers/riverpod_profile_provider.dart';
 import 'features/profile/screens/create_profile_screen.dart';
+import 'services/oauth_service.dart';
+import 'utils/theme_manager.dart';
 
 void main() {
-  // API Client 및 서비스 초기화
-  final apiClient = ApiClient();
-  final profileService = ProfileService(apiClient);
+  WidgetsFlutterBinding.ensureInitialized();
 
   runApp(
-    MultiProvider(
-      providers: [
-        Provider<ApiClient>.value(value: apiClient),
-        Provider<ProfileService>.value(value: profileService),
-        ChangeNotifierProvider<ProfileProvider>(
-          create: (_) => ProfileProvider(profileService),
-        ),
-      ],
-      child: const MyApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({Key? key}) : super(key: key);
 
   @override
-  State<MyApp> createState() => MyAppState();
+  ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class MyAppState extends State<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> {
   ThemeMode _themeMode = ThemeMode.system;
+
+  @override
+  void initState() {
+    super.initState();
+    // Deep Link 리스너 초기화
+    _initializeDeepLinks();
+    // ThemeManager 콜백 설정
+    ThemeManager.setOnThemeModeChanged(setThemeMode);
+  }
+
+  Future<void> _initializeDeepLinks() async {
+    final oauthService = ref.read(oauthServiceProvider);
+    await oauthService.initializeDeepLinkListener();
+  }
 
   void setThemeMode(ThemeMode mode) {
     setState(() {
@@ -53,6 +58,17 @@ class MyAppState extends State<MyApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,
+      // 한국어 로케일 지원
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ko', 'KR'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('ko', 'KR'),
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         dragDevices: {
           PointerDeviceKind.mouse,
@@ -61,7 +77,7 @@ class MyAppState extends State<MyApp> {
           PointerDeviceKind.unknown,
         },
       ),
-      home: const SplashScreen(),  // 자동 로그인 체크 화면
+      home: const AuthGate(),
       routes: {
         '/create-profile': (context) => const CreateProfileScreen(),
       },
@@ -70,46 +86,137 @@ class MyAppState extends State<MyApp> {
   }
 }
 
-/// 스플래시 화면 (자동 로그인 체크)
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+/// 인증 상태에 따라 화면 분기
+class AuthGate extends ConsumerWidget {
+  const AuthGate({Key? key}) : super(key: key);
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
 
-class _SplashScreenState extends State<SplashScreen> {
-  final _authService = AuthService();
-
-  @override
-  void initState() {
-    super.initState();
-    _checkLoginStatus();
-  }
-
-  Future<void> _checkLoginStatus() async {
-    // 약간의 딜레이 (스플래시 효과)
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 토큰 확인
-    final isLoggedIn = await _authService.isLoggedIn();
-
-    if (!mounted) return;
-
-    if (isLoggedIn) {
-      print('✅ Token found, auto login to MainScreen');
-      // 토큰 있음 → 메인 화면
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainScreen()),
-      );
-    } else {
-      print('❌ No token, go to LoginScreen');
-      // 토큰 없음 → 로그인 화면
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+    switch (authState.status) {
+      case AuthStatus.initial:
+      case AuthStatus.checking:
+        return const SplashScreen();
+      case AuthStatus.authenticated:
+        // 인증된 상태에서 프로필 존재 여부 확인
+        return const _ProfileGate();
+      case AuthStatus.unauthenticated:
+      case AuthStatus.error:
+      case AuthStatus.authenticating:
+        return const LoginScreen();
     }
   }
+}
+
+/// 프로필 존재 여부에 따라 화면 분기
+class _ProfileGate extends ConsumerWidget {
+  const _ProfileGate({Key? key}) : super(key: key);
+
+  /// 프로필이 없는 것으로 간주해야 하는 에러인지 확인
+  bool _isProfileNotFoundError(Object error) {
+    final errorStr = error.toString().toLowerCase();
+    return errorStr.contains('404') ||
+        errorStr.contains('not found') ||
+        errorStr.contains('프로필을 찾을 수 없습니다') ||
+        errorStr.contains('profile_not_found');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(myProfileProvider);
+
+    return profileAsync.when(
+      data: (profile) {
+        if (profile == null) {
+          // 프로필이 없으면 생성 화면으로
+          return const CreateProfileScreen();
+        }
+        // 프로필이 있으면 메인 화면으로
+        return const MainScreen();
+      },
+      loading: () => const SplashScreen(),
+      error: (error, stack) {
+        // 프로필 없음 에러는 생성 화면으로
+        if (_isProfileNotFoundError(error)) {
+          return const CreateProfileScreen();
+        }
+
+        // 에러 메시지 추출
+        String errorMessage = '프로필 로딩 중 오류가 발생했습니다.';
+        if (error.toString().contains('network') ||
+            error.toString().contains('connection') ||
+            error.toString().contains('timeout')) {
+          errorMessage = '네트워크 연결을 확인해주세요.';
+        }
+
+        // 디버그용 에러 로그
+        print('ProfileGate error: $error');
+        print('Stack trace: $stack');
+
+        // 다른 에러는 에러 화면 표시
+        return Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      errorMessage,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      error.toString(),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        ref.invalidate(myProfileProvider);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('다시 시도'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 스플래시 화면 (자동 로그인 체크)
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +229,6 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 로고나 로딩 인디케이터
               CircularProgressIndicator(
                 color: Colors.white,
               ),

@@ -1,22 +1,22 @@
 // 채팅 목록 화면
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
-import '../../../data/data_manager.dart';
+import '../../../shared/providers/chat_provider.dart';
+import '../../../data/models/chat/chat.dart';
 import '../widgets/chat_tile.dart';
 import 'conversation_screen.dart';
 import 'team_chat_screen.dart';
-
 import 'create_chat_folder_screen.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  final DataManager _dataManager = DataManager();
+class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _menuAnimationController;
   final TextEditingController _searchController = TextEditingController();
@@ -24,8 +24,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   bool _isMenuOpen = false;
   bool _isSearching = false;
   bool _showUnreadOnly = false;
-  
-  // Custom Chat Folders
+
+  // Custom Chat Folders (will be moved to API later)
   final List<Map<String, dynamic>> _friendChatFolders = [];
   final List<Map<String, dynamic>> _teamChatFolders = [];
   Map<String, dynamic>? _selectedFolder;
@@ -37,7 +37,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
-          // Reset selected folder when switching tabs
           _selectedFolder = null;
           _showUnreadOnly = false;
         });
@@ -78,14 +77,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
-  int get _totalUnreadCount {
-    return _dataManager.chats.fold(0, (sum, chat) => sum + (chat['unread'] as int? ?? 0));
-  }
-
   @override
   Widget build(BuildContext context) {
     final bool isTeamTab = _tabController.index == 1;
     final currentFolders = isTeamTab ? _teamChatFolders : _friendChatFolders;
+    final chatsAsync = ref.watch(chatListProvider);
+
+    // Calculate total unread count
+    final totalUnreadCount = chatsAsync.when(
+      loading: () => 0,
+      error: (_, __) => 0,
+      data: (chats) => chats.fold(0, (sum, chat) => sum + chat.unreadCount),
+    );
 
     return Stack(
       children: [
@@ -201,7 +204,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                
+
                 // Filter Row (All / Unread / Custom Folders)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -223,7 +226,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         _buildFilterChip(
                           label: '안읽음',
                           isSelected: _showUnreadOnly,
-                          count: _totalUnreadCount,
+                          count: totalUnreadCount,
                           onTap: () {
                             setState(() {
                               _showUnreadOnly = true;
@@ -233,7 +236,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                           isUnreadFilter: true,
                         ),
                         const SizedBox(width: 8),
-                        
+
                         // Custom Folder Chips
                         ...currentFolders.map((folder) {
                           final folderName = folder['name'] as String;
@@ -245,10 +248,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                               onTap: () {
                                 setState(() {
                                   if (_selectedFolder == folder) {
-                                    _selectedFolder = null; // Toggle off
+                                    _selectedFolder = null;
                                   } else {
                                     _selectedFolder = folder;
-                                    _showUnreadOnly = false; // Disable unread filter
+                                    _showUnreadOnly = false;
                                   }
                                 });
                               },
@@ -273,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                 builder: (context) => CreateChatFolderScreen(isTeam: isTeamTab),
                               ),
                             );
-                            
+
                             if (result != null && result is Map<String, dynamic>) {
                               setState(() {
                                 currentFolders.add(result);
@@ -335,21 +338,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                      _buildMenuItem(
-                        '메시지 수신 시뮬레이션',
-                        Icons.send_to_mobile,
-                        () {
-                          _toggleMenu();
-                          _dataManager.receiveMockMessage();
-                          setState(() {}); // Refresh UI
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('새로운 메시지가 도착했습니다'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
+                    _buildMenuItem(
+                      '새로고침',
+                      Icons.refresh,
+                      () {
+                        _toggleMenu();
+                        ref.invalidate(chatListProvider);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('채팅 목록을 새로고침합니다'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -358,8 +360,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ],
     );
   }
-
-
 
   Widget _buildFilterChip({
     required String label,
@@ -396,7 +396,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF5A00), // Orange badge
+                  color: const Color(0xFFFF5A00),
                   shape: BoxShape.rectangle,
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -452,79 +452,134 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildChatList({required bool isTeam}) {
-    var chats = _dataManager.chats.where((chat) {
-      final bool chatIsTeam = chat['isTeam'] ?? false;
-      return chatIsTeam == isTeam;
-    }).toList();
+    final chatsAsync = ref.watch(chatListProvider);
 
-    // Filter by search query
-    if (_searchQuery.isNotEmpty) {
-      chats = chats.where((chat) =>
-          chat['name'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          chat['message'].toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    }
+    return chatsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 48, color: AppTheme.textSecondary),
+            const SizedBox(height: 16),
+            const Text(
+              '채팅 목록을 불러올 수 없습니다',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => ref.invalidate(chatListProvider),
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      ),
+      data: (chats) {
+        // Filter by team type (group vs direct)
+        var filteredChats = chats.where((chat) =>
+            (chat.type == ChatType.group) == isTeam
+        ).toList();
 
-    // Filter by unread
-    if (_showUnreadOnly) {
-      chats = chats.where((chat) => (chat['unread'] ?? 0) > 0).toList();
-    }
-    
-    // Filter by selected folder
-    if (_selectedFolder != null) {
-      final members = List<String>.from(_selectedFolder!['members'] ?? []);
-      chats = chats.where((chat) => members.contains(chat['name'])).toList();
-    }
+        // Filter by search query
+        if (_searchQuery.isNotEmpty) {
+          filteredChats = filteredChats.where((chat) {
+            final chatName = chat.name ?? '';
+            final messageContent = chat.lastMessage?.content ?? '';
+            return chatName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                messageContent.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
+        }
 
-    if (chats.isEmpty) {
-      return _buildEmptyState();
-    }
+        // Filter by unread
+        if (_showUnreadOnly) {
+          filteredChats = filteredChats.where((chat) => chat.unreadCount > 0).toList();
+        }
 
-    return ListView.builder(
-      itemCount: chats.length,
-      itemBuilder: (context, index) {
-        final chat = chats[index];
-        return ChatTile(
-          chat: chat,
-          onTap: () {
-            // Clear unread count
-            setState(() {
-              _dataManager.clearUnread(chat['id']);
-            });
+        // Filter by selected folder
+        if (_selectedFolder != null) {
+          final members = List<String>.from(_selectedFolder!['members'] ?? []);
+          filteredChats = filteredChats.where((chat) => members.contains(chat.name ?? '')).toList();
+        }
 
-            if (chat['isTeam'] == true) {
-              // Find team data to get members
-              final team = _dataManager.teams.firstWhere(
-                (t) => t['name'] == chat['name'],
-                orElse: () => {'members': <String>[], 'icon': '👥'},
-              );
-              
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TeamChatScreen(
-                    teamName: chat['name'],
-                    teamIcon: chat['avatar'] ?? '👥',
-                    teamImage: chat['image'],
-                    members: List<String>.from(team['members'] ?? []),
-                  ),
-                ),
-              ).then((_) => setState(() {})); // Refresh on return
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ConversationScreen(
-                    userName: chat['name'],
-                    userImage: chat['image'] ?? '',
-                    isTeam: false,
-                  ),
-                ),
-              ).then((_) => setState(() {})); // Refresh on return
-            }
+        if (filteredChats.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(chatListProvider);
           },
+          child: ListView.builder(
+            itemCount: filteredChats.length,
+            itemBuilder: (context, index) {
+              final chat = filteredChats[index];
+              final isGroupChat = chat.type == ChatType.group;
+              return ChatTile(
+                chat: _chatToMap(chat),
+                onTap: () {
+                  if (isGroupChat) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TeamChatScreen(
+                          teamName: chat.name ?? '그룹 채팅',
+                          teamIcon: '👥',
+                          teamImage: chat.profileImageUrl,
+                          members: [], // Will be loaded from participants
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ConversationScreen(
+                          chatId: chat.id,
+                          userName: chat.name ?? '알 수 없음',
+                          userImage: chat.profileImageUrl ?? '',
+                          isTeam: false,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              );
+            },
+          ),
         );
       },
     );
+  }
+
+  Map<String, dynamic> _chatToMap(Chat chat) {
+    final name = chat.name ?? '알 수 없음';
+    return {
+      'id': chat.id,
+      'name': name,
+      'image': chat.profileImageUrl,
+      'avatar': name.isNotEmpty ? name[0] : '?',
+      'message': chat.lastMessage?.content ?? '',
+      'time': _formatTime(chat.lastMessage?.createdAt),
+      'unread': chat.unreadCount,
+      'isTeam': chat.type == ChatType.group,
+      'isOnline': true,
+    };
+  }
+
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+
+    if (diff.inDays > 0) {
+      return '${diff.inDays}일 전';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}시간 전';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}분 전';
+    } else {
+      return '방금';
+    }
   }
 
   Widget _buildEmptyState() {

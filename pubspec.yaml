@@ -11,13 +11,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.2
   flutter_svg: ^2.2.1
   google_fonts: ^6.1.0
   http: ^1.1.0
   dio: ^5.4.0
   shared_preferences: ^2.2.0
-  provider: ^6.1.0
   image_picker: ^1.2.1
   file_picker: ^10.3.7
   record: ^6.1.2
@@ -29,10 +30,40 @@ dependencies:
   audioplayers: ^6.5.1
   http_parser: ^4.0.2
 
+  # State Management (Riverpod)
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.3.0
+
+  # Security & OAuth
+  flutter_secure_storage: ^9.1.0
+  uni_links: ^0.5.1
+  crypto: ^3.0.3
+
+  # WebSocket STOMP
+  stomp_dart_client: ^1.0.0
+
+  # Firebase & FCM
+#  firebase_core: ^2.24.2
+#  firebase_messaging: ^14.7.10
+  flutter_local_notifications: ^16.1.0
+
+  # Model Generation
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.8.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+  # Code Generation
+  freezed: ^2.4.5
+  json_serializable: ^6.7.1
+  build_runner: ^2.4.6
+  riverpod_generator: ^2.3.0
+
+  # Testing
+  mocktail: ^1.0.1
 
 flutter:
   uses-material-design: true

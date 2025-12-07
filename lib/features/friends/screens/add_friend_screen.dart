@@ -1,7 +1,11 @@
 // 친구 추가 및 검색 화면
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/friend_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
+import '../../../data/models/agora_profile_response.dart';
 
-class AddFriendScreen extends StatefulWidget {
+class AddFriendScreen extends ConsumerStatefulWidget {
   final Function(Map<String, dynamic>) onFriendAdded;
 
   const AddFriendScreen({
@@ -10,16 +14,14 @@ class AddFriendScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<AddFriendScreen> createState() => _AddFriendScreenState();
+  ConsumerState<AddFriendScreen> createState() => _AddFriendScreenState();
 }
 
-class _AddFriendScreenState extends State<AddFriendScreen>
+class _AddFriendScreenState extends ConsumerState<AddFriendScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TextEditingController _searchController;
   String _searchQuery = '';
-  bool _isSearching = false;
-  List<Map<String, dynamic>> _searchResults = [];
   String _selectedCountryCode = '+82';
 
   final Map<String, String> _countryCodes = {
@@ -30,66 +32,6 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     '영국': '+44',
     '호주': '+61',
   };
-
-  // 모의 친구 데이터베이스
-  final List<Map<String, dynamic>> _availableFriends = [
-    {
-      'name': '김철수',
-      'phone': '010-1234-5678',
-      'id': 'kim_cs',
-      'avatar': '👨',
-      'image': 'https://picsum.photos/id/1011/200/200',
-      'isBirthday': false
-    },
-    {
-      'name': '이영희',
-      'phone': '010-2345-6789',
-      'id': 'lee_yh',
-      'avatar': '👩',
-      'image': 'https://picsum.photos/id/1027/200/200',
-      'isBirthday': true
-    },
-    {
-      'name': '박민준',
-      'phone': '010-3456-7890',
-      'id': 'park_mj',
-      'avatar': '👨',
-      'image': 'https://picsum.photos/id/1005/200/200',
-      'isBirthday': false
-    },
-    {
-      'name': '최수진',
-      'phone': '010-4567-8901',
-      'id': 'choi_sj',
-      'avatar': '👩',
-      'image': 'https://picsum.photos/id/1014/200/200',
-      'isBirthday': true
-    },
-    {
-      'name': '정준호',
-      'phone': '010-5678-9012',
-      'id': 'jung_jh',
-      'avatar': '👨',
-      'image': 'https://picsum.photos/id/1012/200/200',
-      'isBirthday': false
-    },
-    {
-      'name': '홍길동',
-      'phone': '010-6789-0123',
-      'id': 'hong_gd',
-      'avatar': '👨',
-      'image': 'https://picsum.photos/id/1015/200/200',
-      'isBirthday': true
-    },
-    {
-      'name': '유미영',
-      'phone': '010-7890-1234',
-      'id': 'yu_my',
-      'avatar': '👩',
-      'image': 'https://picsum.photos/id/1025/200/200',
-      'isBirthday': false
-    },
-  ];
 
   @override
   void initState() {
@@ -105,52 +47,61 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     super.dispose();
   }
 
-  void _searchFriend() {
-    if (_searchQuery.isEmpty) {
-      setState(() {
-        _searchResults = [];
-      });
-      return;
+  /// 친구 요청 보내기
+  Future<void> _sendFriendRequest(String targetAgoraId) async {
+    final notifier = ref.read(friendActionProvider.notifier);
+    final success = await notifier.sendFriendRequest(targetAgoraId);
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('친구 요청을 보냈습니다'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // 검색 결과 초기화
+        setState(() {
+          _searchQuery = '';
+          _searchController.clear();
+        });
+      } else {
+        // 에러는 build 메서드에서 표시
+      }
     }
-
-    setState(() {
-      _isSearching = true;
-      _searchResults = [];
-    });
-
-    // 검색 시뮬레이션 (0.5초 딜레이)
-    Future.delayed(const Duration(milliseconds: 500), () {
-      final results = _availableFriends
-          .where((friend) =>
-              (friend['phone'] as String).contains(_searchQuery) ||
-              (friend['id'] as String)
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()) ||
-              (friend['name'] as String)
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()))
-          .toList();
-
-      setState(() {
-        _isSearching = false;
-        _searchResults = results;
-      });
-    });
-  }
-
-  void _addFriend(Map<String, dynamic> friend) {
-    widget.onFriendAdded(friend);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${friend['name']}을(를) 친구로 추가했습니다'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    // 친구 작업 상태 감시
+    final actionState = ref.watch(friendActionProvider);
+
+    // 에러 표시
+    if (actionState.error != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(actionState.error!),
+            backgroundColor: Colors.red,
+          ),
+        );
+        ref.read(friendActionProvider.notifier).clearError();
+      });
+    }
+
+    // 성공 메시지 표시
+    if (actionState.successMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(actionState.successMessage!),
+            backgroundColor: Colors.green,
+          ),
+        );
+        ref.read(friendActionProvider.notifier).clearSuccessMessage();
+      });
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -278,7 +229,6 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                             _searchQuery = value;
                           });
                         },
-                        onSubmitted: (_) => _searchFriend(),
                         decoration: InputDecoration(
                           hintText: '010-1234-5678',
                           hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -293,11 +243,8 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                     ),
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        icon: const Icon(Icons.search,
-                            color: Colors.grey, size: 20),
-                        onPressed: _searchFriend,
-                      ),
+                      child: Icon(Icons.search,
+                          color: Colors.grey, size: 20),
                     ),
                   ],
                 ),
@@ -307,9 +254,33 @@ class _AddFriendScreenState extends State<AddFriendScreen>
         ),
         ),
         Expanded(
-          child: _buildSearchResultsList(),
+          child: _buildPhoneSearchPlaceholder(),
         ),
       ],
+    );
+  }
+
+  /// 전화번호 검색 플레이스홀더 (현재 API 미지원)
+  Widget _buildPhoneSearchPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.phone_disabled_outlined,
+            size: 60,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '전화번호 검색은 준비 중입니다',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -342,9 +313,8 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                       _searchQuery = value;
                     });
                   },
-                  onSubmitted: (_) => _searchFriend(),
                   decoration: InputDecoration(
-                    hintText: 'abcd',
+                    hintText: 'agora_id',
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     prefixIcon: const Icon(Icons.person_outline,
                         color: Colors.grey, size: 20),
@@ -354,17 +324,13 @@ class _AddFriendScreenState extends State<AddFriendScreen>
                               _searchController.clear();
                               setState(() {
                                 _searchQuery = '';
-                                _searchResults = [];
                               });
                             },
                             child: const Icon(Icons.close,
                                 color: Colors.grey, size: 20),
                           )
-                        : IconButton(
-                            icon: const Icon(Icons.search,
-                                color: Colors.grey, size: 20),
-                            onPressed: _searchFriend,
-                          ),
+                        : const Icon(Icons.search,
+                            color: Colors.grey, size: 20),
                     border: InputBorder.none,
                     filled: false,
                     fillColor: Colors.transparent,
@@ -377,7 +343,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
           ),
         ),
         Expanded(
-          child: _buildSearchResultsList(),
+          child: _buildIdSearchResults(),
         ),
       ],
     );
@@ -444,117 +410,77 @@ class _AddFriendScreenState extends State<AddFriendScreen>
     );
   }
 
-  Widget _buildSearchResultsList() {
-    if (_searchQuery.isEmpty) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '추천 친구',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+  /// 아이디 검색 결과 위젯 (실제 API 연동)
+  Widget _buildIdSearchResults() {
+    if (_searchQuery.isEmpty || _searchQuery.length < 2) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 60,
+              color: Colors.grey.shade300,
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _availableFriends.take(4).length,
-              itemBuilder: (context, index) {
-                final friend = _availableFriends[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(12),
-                          image: friend['image'] != null
-                              ? DecorationImage(
-                                  image: NetworkImage(friend['image'] as String),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: friend['image'] == null
-                            ? Center(
-                                child: Text(
-                                  friend['avatar'] as String,
-                                  style: const TextStyle(fontSize: 28),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              friend['name'] as String,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              friend['phone'] as String,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => _addFriend(friend),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade400,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.person_add,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            const SizedBox(height: 16),
+            Text(
+              'Agora ID를 입력하세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              '최소 2글자 이상 입력해주세요',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade400,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    if (_isSearching) {
-      return Center(
+    final searchResults = ref.watch(userSearchProvider(_searchQuery));
+    final actionState = ref.watch(friendActionProvider);
+
+    return searchResults.when(
+      data: (users) {
+        if (users.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.person_off_outlined,
+                  size: 60,
+                  color: Colors.grey.shade300,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '검색 결과가 없습니다',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            return _buildUserCard(user, actionState.isLoading);
+          },
+        );
+      },
+      loading: () => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -576,112 +502,145 @@ class _AddFriendScreenState extends State<AddFriendScreen>
             ),
           ],
         ),
-      );
-    }
-
-    if (_searchResults.isEmpty) {
-      return Center(
+      ),
+      error: (error, stack) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.person_off_outlined,
+              Icons.error_outline,
               size: 60,
-              color: Colors.grey.shade300,
+              color: Colors.red.shade300,
             ),
             const SizedBox(height: 16),
             Text(
-              '검색 결과가 없습니다',
+              '검색 중 오류가 발생했습니다',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade400,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _searchResults.length,
-      itemBuilder: (context, index) {
-        final friend = _searchResults[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(12),
-                  image: friend['image'] != null
-                      ? DecorationImage(
-                          image: NetworkImage(friend['image'] as String),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: friend['image'] == null
-                    ? Center(
-                        child: Text(
-                          friend['avatar'] as String,
-                          style: const TextStyle(fontSize: 28),
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      friend['name'] as String,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      friend['phone'] as String,
+  /// 사용자 카드 위젯
+  Widget _buildUserCard(AgoraProfileResponse user, bool isLoading) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          // 프로필 이미지
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade100,
+              borderRadius: BorderRadius.circular(12),
+              image: user.profileImageUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(user.profileImageUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: user.profileImageUrl == null
+                ? Center(
+                    child: Text(
+                      user.displayName.isNotEmpty
+                          ? user.displayName[0].toUpperCase()
+                          : '?',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => _addFriend(friend as Map<String, String>),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade400,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.person_add,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
+                  )
+                : null,
           ),
-        );
-      },
+          const SizedBox(width: 16),
+          // 사용자 정보
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.displayName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '@${user.agoraId}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                if (user.statusMessage != null && user.statusMessage!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      user.statusMessage!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 친구 추가 버튼
+          GestureDetector(
+            onTap: isLoading ? null : () => _sendFriendRequest(user.agoraId),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isLoading ? Colors.grey.shade300 : Colors.blue.shade400,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: isLoading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person_add,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -709,7 +668,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
             ),
             const SizedBox(height: 16),
             const Text(
-              'QR 코드를 카메라에 맞춰주세요',
+              'QR 코드 스캔 기능은 준비 중입니다',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
@@ -718,31 +677,7 @@ class _AddFriendScreenState extends State<AddFriendScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              // 모의 QR 코드 스캔 결과
-              final scannedId = 'kim_cs';
-              final friend = _availableFriends
-                  .firstWhere((f) => f['id'] == scannedId, orElse: () => {});
-
-              Navigator.pop(context);
-
-              if (friend.isNotEmpty) {
-                _addFriend(friend as Map<String, String>);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('등록되지 않은 사용자입니다')),
-                );
-              }
-            },
-            icon: const Icon(Icons.check),
-            label: const Text('스캔 완료'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade400,
-              foregroundColor: Colors.white,
-            ),
+            child: const Text('닫기'),
           ),
         ],
       ),

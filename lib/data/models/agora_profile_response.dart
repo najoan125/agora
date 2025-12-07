@@ -1,28 +1,38 @@
 class AgoraProfileResponse {
   final String agoraId;
   final String displayName;
-  final String? profileImageUrl;
-  final String? statusMessage;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final String? profileImage;
+  final String? bio;
+  final String? phone;
+  final String? birthday;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   AgoraProfileResponse({
     required this.agoraId,
     required this.displayName,
-    this.profileImageUrl,
-    this.statusMessage,
-    required this.createdAt,
-    required this.updatedAt,
+    this.profileImage,
+    this.bio,
+    this.phone,
+    this.birthday,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory AgoraProfileResponse.fromJson(Map<String, dynamic> json) {
     return AgoraProfileResponse(
       agoraId: json['agoraId'] as String,
       displayName: json['displayName'] as String,
-      profileImageUrl: json['profileImageUrl'] as String?,
-      statusMessage: json['statusMessage'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      profileImage: json['profileImage'] as String?,
+      bio: json['bio'] as String?,
+      phone: json['phone'] as String?,
+      birthday: json['birthday'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
     );
   }
 
@@ -30,10 +40,17 @@ class AgoraProfileResponse {
     return {
       'agoraId': agoraId,
       'displayName': displayName,
-      'profileImageUrl': profileImageUrl,
-      'statusMessage': statusMessage,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'profileImage': profileImage,
+      'bio': bio,
+      'phone': phone,
+      'birthday': birthday,
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
   }
+
+  // 하위 호환성을 위한 getter
+  String? get profileImageUrl => profileImage;
+
+  String? get statusMessage => bio;
 }

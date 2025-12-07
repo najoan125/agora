@@ -2,20 +2,19 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../shared/providers/profile_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 import '../../../core/theme.dart';
-import '../../main/main_screen.dart';
 
-class CreateProfileScreen extends StatefulWidget {
+class CreateProfileScreen extends ConsumerStatefulWidget {
   const CreateProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<CreateProfileScreen> createState() => _CreateProfileScreenState();
+  ConsumerState<CreateProfileScreen> createState() => _CreateProfileScreenState();
 }
 
-class _CreateProfileScreenState extends State<CreateProfileScreen> {
+class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _agoraIdController = TextEditingController();
   final _displayNameController = TextEditingController();
@@ -55,12 +54,11 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
       _isIdAvailable = null;
     });
 
-    final provider = context.read<ProfileProvider>();
-    final available = await provider.checkAgoraIdAvailable(_agoraIdController.text);
+    final asyncValue = await ref.read(agoraIdAvailableProvider(_agoraIdController.text).future);
 
     setState(() {
       _isCheckingId = false;
-      _isIdAvailable = available;
+      _isIdAvailable = asyncValue;
     });
   }
 
@@ -75,37 +73,34 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
     //   return;
     // }
 
+    final notifier = ref.read(profileActionProvider.notifier);
 
-    final provider = context.read<ProfileProvider>();
-    
-    final success = await provider.createProfile(
+    final profile = await notifier.createProfile(
       agoraId: _agoraIdController.text,
       displayName: _displayNameController.text,
-      statusMessage: _statusMessageController.text.isEmpty 
-          ? null 
+      bio: _statusMessageController.text.isEmpty
+          ? null
           : _statusMessageController.text,
     );
 
-    if (success) {
+    if (profile != null) {
       // 이미지가 있으면 업로드
       if (_selectedImage != null) {
-        await provider.updateProfileImage(_selectedImage!);
+        await notifier.updateProfileImage(_selectedImage!);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('프로필이 생성되었습니다.')),
         );
-        // 메인 화면으로 이동 (이전 화면들을 모두 제거)
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-          (route) => false,
-        );
+        // myProfileProvider를 invalidate하면 _ProfileGate가 자동으로 MainScreen을 보여줌
+        ref.invalidate(myProfileProvider);
       }
     } else {
       if (mounted) {
+        final errorMessage = ref.read(profileActionProvider).error ?? '프로필 생성에 실패했습니다.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(provider.error ?? '프로필 생성에 실패했습니다.')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     }
@@ -173,8 +168,9 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                         ),
                       ],
                     ),
-                    child: Consumer<ProfileProvider>(
-                      builder: (context, provider, child) {
+                    child: Builder(
+                      builder: (context) {
+                        final actionState = ref.watch(profileActionProvider);
                         return Form(
                           key: _formKey,
                           child: Column(
@@ -391,7 +387,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                               SizedBox(
                                 height: 56,
                                 child: ElevatedButton(
-                                  onPressed: provider.isLoading ? null : _createProfile,
+                                  onPressed: actionState.isLoading ? null : _createProfile,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppTheme.primaryColor,
                                     shape: RoundedRectangleBorder(
@@ -400,7 +396,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                                     elevation: 8,
                                     shadowColor: AppTheme.primaryColor.withOpacity(0.4),
                                   ),
-                                  child: provider.isLoading
+                                  child: actionState.isLoading
                                       ? const SizedBox(
                                           height: 24,
                                           width: 24,

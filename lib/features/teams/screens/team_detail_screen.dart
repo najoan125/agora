@@ -795,6 +795,7 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => ConversationScreen(
+                      chatId: '', // TODO: Get or create chat ID for this member
                       userName: member,
                       userImage: DataManager().getMemberImage(member),
                     ),

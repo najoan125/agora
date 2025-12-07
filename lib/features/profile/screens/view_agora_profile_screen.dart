@@ -1,30 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../shared/providers/profile_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 import '../../../core/theme.dart';
 import 'create_profile_screen.dart';
 import 'edit_agora_profile_screen.dart';
 
 /// Agora 프로필 조회 화면 (사용 예시)
-class ViewAgoraProfileScreen extends StatefulWidget {
+class ViewAgoraProfileScreen extends ConsumerWidget {
   const ViewAgoraProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<ViewAgoraProfileScreen> createState() => _ViewAgoraProfileScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(myProfileProvider);
 
-class _ViewAgoraProfileScreenState extends State<ViewAgoraProfileScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // 화면 로드 시 프로필 불러오기
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().loadMyProfile();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -56,44 +44,36 @@ class _ViewAgoraProfileScreenState extends State<ViewAgoraProfileScreen> {
           ),
         ],
       ),
-      body: Consumer<ProfileProvider>(
-        builder: (context, provider, child) {
-          // 로딩 중
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // 에러 발생
-          if (provider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.error!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      provider.loadMyProfile();
-                    },
-                    child: const Text('다시 시도'),
-                  ),
-                ],
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red,
               ),
-            );
-          }
-
+              const SizedBox(height: 16),
+              Text(
+                error.toString(),
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(myProfileProvider);
+                },
+                child: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
+        data: (profile) {
           // 프로필 없음 (생성 필요)
-          if (provider.myProfile == null) {
+          if (profile == null) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -128,7 +108,7 @@ class _ViewAgoraProfileScreenState extends State<ViewAgoraProfileScreen> {
                         ),
                       );
                       if (result == true) {
-                        provider.loadMyProfile();
+                        ref.invalidate(myProfileProvider);
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -147,7 +127,6 @@ class _ViewAgoraProfileScreenState extends State<ViewAgoraProfileScreen> {
           }
 
           // 프로필 표시
-          final profile = provider.myProfile!;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -239,9 +218,12 @@ class _ViewAgoraProfileScreenState extends State<ViewAgoraProfileScreen> {
                 const SizedBox(height: 32),
                 
                 // 생성일/수정일
-                _buildInfoRow('생성일', _formatDate(profile.createdAt)),
-                const SizedBox(height: 8),
-                _buildInfoRow('최근 수정', _formatDate(profile.updatedAt)),
+                if (profile.createdAt != null)
+                  _buildInfoRow('생성일', _formatDate(profile.createdAt!)),
+                if (profile.createdAt != null && profile.updatedAt != null)
+                  const SizedBox(height: 8),
+                if (profile.updatedAt != null)
+                  _buildInfoRow('최근 수정', _formatDate(profile.updatedAt!)),
               ],
             ),
           );

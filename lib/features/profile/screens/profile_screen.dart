@@ -189,6 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => ConversationScreen(
+                    chatId: widget.user['chatId'] ?? '', // TODO: Get or create chat ID
                     userName: widget.user['name'],
                     userImage: widget.user['image'] ?? '',
                   ),

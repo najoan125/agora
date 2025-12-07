@@ -40,7 +40,9 @@ class ProfileProvider extends ChangeNotifier {
   Future<bool> createProfile({
     required String agoraId,
     required String displayName,
-    String? statusMessage,
+    String? bio,
+    String? phone,
+    String? birthday,
   }) async {
     _isLoading = true;
     _error = null;
@@ -50,7 +52,9 @@ class ProfileProvider extends ChangeNotifier {
       final request = CreateAgoraProfileRequest(
         agoraId: agoraId,
         displayName: displayName,
-        statusMessage: statusMessage,
+        bio: bio,
+        phone: phone,
+        birthday: birthday,
       );
       _myProfile = await _profileService.createProfile(request);
       _error = null;
@@ -68,8 +72,11 @@ class ProfileProvider extends ChangeNotifier {
 
   /// 프로필 수정
   Future<bool> updateProfile({
+    String? agoraId,
     String? displayName,
-    String? statusMessage,
+    String? bio,
+    String? phone,
+    String? birthday,
   }) async {
     _isLoading = true;
     _error = null;
@@ -77,8 +84,11 @@ class ProfileProvider extends ChangeNotifier {
 
     try {
       final request = UpdateAgoraProfileRequest(
+        agoraId: agoraId,
         displayName: displayName,
-        statusMessage: statusMessage,
+        bio: bio,
+        phone: phone,
+        birthday: birthday,
       );
       _myProfile = await _profileService.updateProfile(request);
       _error = null;
@@ -126,16 +136,12 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  /// 사용자 검색
+  /// 사용자 검색 (keyword로 agoraId, displayName 통합 검색)
   Future<List<AgoraProfileResponse>> searchUsers({
-    String? agoraId,
-    String? displayName,
+    required String keyword,
   }) async {
     try {
-      return await _profileService.searchUsers(
-        agoraId: agoraId,
-        displayName: displayName,
-      );
+      return await _profileService.searchUsers(keyword: keyword);
     } catch (e) {
       _error = e.toString();
       notifyListeners();

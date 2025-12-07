@@ -1,18 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
-import '../../../shared/providers/profile_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _statusController = TextEditingController();
@@ -25,11 +25,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
-      final profile = context.read<ProfileProvider>().myProfile;
-      if (profile != null) {
-        _nameController.text = profile.displayName;
-        _statusController.text = profile.statusMessage ?? '';
-      }
+      final profileAsync = ref.read(myProfileProvider);
+      profileAsync.whenData((profile) {
+        if (profile != null && mounted) {
+          _nameController.text = profile.displayName;
+          _statusController.text = profile.statusMessage ?? '';
+        }
+      });
       _isInitialized = true;
     }
   }
@@ -62,14 +64,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     print('📝 상태 메시지: ${_statusController.text}');
     print('🖼️ 이미지 선택됨: ${_selectedImage != null}');
 
-    final provider = context.read<ProfileProvider>();
-    
+    final notifier = ref.read(profileActionProvider.notifier);
+
     // 프로필 정보 업데이트
     print('🔄 [EditProfile] 프로필 정보 업데이트 요청...');
-    final success = await provider.updateProfile(
+    final success = await notifier.updateProfile(
       displayName: _nameController.text,
-      statusMessage: _statusController.text.isEmpty 
-          ? null 
+      bio: _statusController.text.isEmpty
+          ? null
           : _statusController.text,
     );
 
@@ -78,7 +80,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // 이미지가 선택되었으면 이미지도 업데이트
     if (_selectedImage != null && success) {
       print('🔄 [EditProfile] 프로필 이미지 업데이트 요청...');
-      await provider.updateProfileImage(_selectedImage!);
+      await notifier.updateProfileImage(_selectedImage!);
       print('📊 [EditProfile] 프로필 이미지 업데이트 완료');
     }
 
@@ -90,9 +92,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
         Navigator.pop(context, true);
       } else {
-        print('❌ [EditProfile] 프로필 저장 실패: ${provider.error}');
+        print('❌ [EditProfile] 프로필 저장 실패: ${ref.read(profileActionProvider).error}');
+        final errorMessage = ref.read(profileActionProvider).error ?? '프로필 업데이트에 실패했습니다.';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(provider.error ?? '프로필 업데이트에 실패했습니다.')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     }
@@ -130,16 +133,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ],
       ),
-      body: Consumer<ProfileProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Builder(
+        builder: (context) {
+          final profileAsync = ref.watch(myProfileProvider);
+          final actionState = ref.watch(profileActionProvider);
 
-          final profile = provider.myProfile;
-          if (profile == null) {
-            // 프로필이 없으면 안내 메시지와 프로필 생성 버튼 표시
-            return Center(
+          return profileAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(
+              child: Text('프로필을 불러올 수 없습니다: $error'),
+            ),
+            data: (profile) {
+              if (profile == null) {
+                // 프로필이 없으면 안내 메시지와 프로필 생성 버튼 표시
+                return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
@@ -197,10 +204,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ],
                 ),
               ),
-            );
-          }
+                );
+              }
 
-          return SingleChildScrollView(
+              // 프로필 데이터가 로드되면 컨트롤러 초기화
+              if (_nameController.text.isEmpty) {
+                _nameController.text = profile.displayName;
+                _statusController.text = profile.statusMessage ?? '';
+              }
+
+              return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Form(
               key: _formKey,
@@ -229,6 +242,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ],
               ),
             ),
+              );
+            },
           );
         },
       ),

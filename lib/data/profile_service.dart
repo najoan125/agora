@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'api_client.dart';
+import '../core/constants/api_endpoints.dart';
 import 'models/agora_profile_response.dart';
 import 'models/create_agora_profile_request.dart';
 import 'models/update_agora_profile_request.dart';
@@ -12,9 +13,19 @@ class ProfileService {
   ProfileService(this._apiClient);
 
   /// GET - 내 Agora 프로필 조회
-  Future<AgoraProfileResponse> getMyProfile() async {
+  /// 프로필이 없으면 null 반환
+  Future<AgoraProfileResponse?> getMyProfile() async {
     try {
       final response = await _apiClient.get('/api/agora/profile');
+
+      // 서버에서 hasProfile: false로 프로필 없음을 알려주는 경우
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        if (data['hasProfile'] == false) {
+          return null;
+        }
+      }
+
       return AgoraProfileResponse.fromJson(response.data);
     } catch (e) {
       throw _handleError(e);
@@ -56,31 +67,50 @@ class ProfileService {
   }
 
   /// PUT - 프로필 이미지 변경
+  /// 1. 파일 API로 이미지 업로드 → URL 받기
+  /// 2. 프로필 API로 URL 전달
   Future<void> updateProfileImage(File imageFile) async {
     try {
       print('🔵 [ProfileService] 프로필 이미지 업데이트 시작');
       print('📤 이미지 파일: ${imageFile.path}');
-      
+
+      // 1. 파일 API로 이미지 업로드
       String fileName = imageFile.path.split('/').last;
-      
+
       FormData formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(
+        'file': await MultipartFile.fromFile(
           imageFile.path,
           filename: fileName,
           contentType: MediaType('image', 'jpeg'),
         ),
       });
 
-      await _apiClient.dio.put(
-        '/api/agora/profile/image',
+      final uploadResponse = await _apiClient.dio.post(
+        '/api/agora/files/upload-image',
         data: formData,
-        options: Options(
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        ),
       );
-      
+
+      print('✅ [ProfileService] 이미지 업로드 성공: ${uploadResponse.data}');
+
+      // 2. 반환받은 URL로 프로필 이미지 업데이트
+      // 서버가 'fileUrl' 또는 'url'로 반환
+      var imageUrl = (uploadResponse.data['fileUrl'] ?? uploadResponse.data['url']) as String?;
+      if (imageUrl == null) {
+        throw '이미지 URL을 받지 못했습니다.';
+      }
+
+      // 상대 경로인 경우 전체 URL로 변환
+      if (imageUrl.startsWith('/')) {
+        imageUrl = '${ApiEndpoints.baseUrl}$imageUrl';
+      }
+
+      print('📤 [ProfileService] 프로필 이미지 URL: $imageUrl');
+
+      await _apiClient.put(
+        '/api/agora/profile/image',
+        data: {'profileImage': imageUrl},
+      );
+
       print('✅ [ProfileService] 프로필 이미지 업데이트 성공');
     } catch (e) {
       print('❌ [ProfileService] 프로필 이미지 업데이트 실패: $e');
@@ -98,23 +128,30 @@ class ProfileService {
     }
   }
 
-  /// GET - 사용자 검색 (agoraId, displayName)
+  /// GET - 사용자 검색 (keyword로 agoraId, displayName 통합 검색)
   Future<List<AgoraProfileResponse>> searchUsers({
-    String? agoraId,
-    String? displayName,
+    required String keyword,
   }) async {
     try {
-      final queryParams = <String, dynamic>{};
-      if (agoraId != null) queryParams['agoraId'] = agoraId;
-      if (displayName != null) queryParams['displayName'] = displayName;
-
       final response = await _apiClient.get(
         '/api/agora/profile/search',
-        queryParameters: queryParams,
+        queryParameters: {'keyword': keyword},
       );
 
-      return (response.data as List)
-          .map((json) => AgoraProfileResponse.fromJson(json))
+      // 서버가 페이지네이션 응답 { content: [...] } 형태로 반환
+      final data = response.data;
+      List<dynamic> users;
+
+      if (data is List) {
+        users = data;
+      } else if (data is Map && data['content'] != null) {
+        users = data['content'] as List;
+      } else {
+        users = [];
+      }
+
+      return users
+          .map((json) => AgoraProfileResponse.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw _handleError(e);

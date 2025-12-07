@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
 
 class ThemeManager {
   static ThemeMode _currentMode = ThemeMode.system;
 
   static ThemeMode get currentMode => _currentMode;
 
+  // Theme mode change callback - to be set by MyApp
+  static void Function(ThemeMode)? _onThemeModeChanged;
+
+  static void setOnThemeModeChanged(void Function(ThemeMode) callback) {
+    _onThemeModeChanged = callback;
+  }
+
   static void setThemeMode(BuildContext context, ThemeMode mode) {
     _currentMode = mode;
-    // MaterialApp 강제 재빌드
-    final state = context.findAncestorStateOfType<MyAppState>();
-    state?.setThemeMode(mode);
+    // 콜백을 통해 테마 변경 알림
+    _onThemeModeChanged?.call(mode);
   }
 
   static String getThemeModeLabel(ThemeMode mode) {

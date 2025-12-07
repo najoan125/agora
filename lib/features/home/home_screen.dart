@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
-import '../../data/data_manager.dart';
-import '../../shared/providers/profile_provider.dart';
+import '../../shared/providers/riverpod_profile_provider.dart';
+import '../../shared/providers/friend_provider.dart';
+import '../../shared/providers/team_provider.dart';
 import '../friends/widgets/friend_tile.dart';
 import '../friends/widgets/friend_request_tile.dart';
 import '../../shared/widgets/collapsible_section.dart';
 import '../chat/widgets/group_chat_tile.dart';
 import '../profile/screens/profile_screen.dart';
+import '../profile/screens/edit_agora_profile_screen.dart';
 import '../friends/screens/add_friend_screen.dart';
 import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
@@ -16,81 +18,24 @@ import 'screens/notification_screen.dart';
 import '../chat/screens/create_group_screen.dart';
 import '../chat/screens/group_chat_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final DataManager _dataManager = DataManager();
+class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _menuAnimationController;
   final FocusNode _searchFocusNode = FocusNode();
-  String _sortOption = 'recent'; // 'recent' or 'name'
+  String _sortOption = 'recent';
   String _searchQuery = '';
   bool _isMenuOpen = false;
   bool _isGroupChatExpanded = true;
-  bool _isTeamListExpanded = true;
 
-  // Group Chats list
-  final List<Map<String, dynamic>> _groupChats = [
-    {
-      'name': '주말 등산',
-      'image': 'https://picsum.photos/id/1036/200/200',
-      'info': '이번 주 관악산?',
-      'members': ['김철수', '이영희', '박민수']
-    },
-    {
-      'name': '스터디 그룹',
-      'image': 'https://picsum.photos/id/1010/200/200',
-      'info': '오후 8시 줌 미팅',
-      'members': ['최지은', '정우성', '한지민', '강동원']
-    },
-    {
-      'name': '점심 팟',
-      'image': 'https://picsum.photos/id/1080/200/200',
-      'info': '오늘 메뉴는?',
-      'members': ['김민지', '박서준']
-    },
-    {
-      'name': '프로젝트 A',
-      'image': 'https://picsum.photos/id/119/200/200',
-      'info': '마감일 확인',
-      'members': ['이준호', '송혜교', '현빈']
-    },
-    {
-      'name': '영화 번개',
-      'image': 'https://picsum.photos/id/1040/200/200',
-      'info': '이번 주말 영화 보러 가실 분?',
-      'members': ['박보검', '김유정']
-    },
-    {
-      'name': '맛집 탐방',
-      'image': 'https://picsum.photos/id/1060/200/200',
-      'info': '강남역 맛집 추천 좀',
-      'members': ['백종원', '성시경', '최자']
-    },
-    {
-      'name': '독서 모임',
-      'image': 'https://picsum.photos/id/1073/200/200',
-      'info': '이번 달 도서 선정 투표',
-      'members': ['김영하', '유시민']
-    },
-    {
-      'name': '운동 인증',
-      'image': 'https://picsum.photos/id/1025/200/200',
-      'info': '오늘도 오운완!',
-      'members': ['김종국', '비', '권상우']
-    },
-    {
-      'name': '여행 계획',
-      'image': 'https://picsum.photos/id/1015/200/200',
-      'info': '제주도 비행기표 예매 완료',
-      'members': ['나영석', '이서진']
-    },
-  ];
+  // Group Chats list (will be loaded from API)
+  final List<Map<String, dynamic>> _groupChats = [];
 
   @override
   void initState() {
@@ -104,18 +49,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {});
     });
     _tabController.addListener(() {
-      setState(() {}); // Rebuild to update AppBar icons when tab changes
+      setState(() {});
     });
-    
-    // 프로필 정보 로드
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadProfile();
-    });
-  }
-
-  Future<void> _loadProfile() async {
-    final profileProvider = context.read<ProfileProvider>();
-    await profileProvider.loadMyProfile();
   }
 
   @override
@@ -147,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             backgroundColor: Colors.white,
             elevation: 0,
             actions: [
-              // Show person_add icon only on Friends tab (index 0)
               if (_tabController.index == 0)
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined,
@@ -158,16 +92,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       MaterialPageRoute(
                         builder: (context) => AddFriendScreen(
                           onFriendAdded: (friend) {
-                            setState(() {
-                              _dataManager.addFriend(friend);
-                            });
+                            // Refresh friend list
+                            ref.invalidate(friendListProvider);
                           },
                         ),
                       ),
                     );
                   },
                 ),
-              // Show notification bell only on Team tab (index 1)
               if (_tabController.index == 1)
                 IconButton(
                   icon: const Icon(Icons.notifications_outlined,
@@ -317,15 +249,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFriendsTab() {
-    return Consumer<ProfileProvider>(
-      builder: (context, profileProvider, child) {
-        // 프로필이 로드되지 않았으면 로딩 표시
-        if (profileProvider.isLoading && profileProvider.myProfile == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final profileAsync = ref.watch(myProfileProvider);
+    final friendsAsync = ref.watch(friendListProvider);
+    final requestsAsync = ref.watch(friendRequestsProvider);
+    final birthdaysAsync = ref.watch(upcomingBirthdaysProvider);
 
-        // 프로필 정보 가져오기 (없으면 기본값 사용)
-        final profile = profileProvider.myProfile;
+    return profileAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('오류: $error')),
+      data: (profile) {
         final user = profile != null
             ? {
                 'name': profile.displayName,
@@ -333,380 +265,519 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'image': profile.profileImageUrl,
                 'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
               }
-            : _dataManager.currentUser;
+            : {
+                'name': '사용자',
+                'statusMessage': '상태 메시지를 설정하세요',
+                'image': null,
+                'avatar': '?',
+              };
 
-        final friends = _dataManager.friends;
-
-        final filteredFriends = _searchQuery.isEmpty
-            ? List<Map<String, dynamic>>.from(friends)
-            : friends
-                .where((f) =>
-                    f['name'].toLowerCase().contains(_searchQuery.toLowerCase()))
-                .toList();
-
-        if (_sortOption == 'name') {
-          filteredFriends
-              .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
-        }
-        // 'recent' option keeps the original order (assuming it's already sorted by recent or default)
-
-        final favorites =
-            filteredFriends.where((f) => f['isFavorite'] == true).toList();
-        final birthdays =
-            filteredFriends.where((f) => f['isBirthday'] == true).toList();
-        final otherFriends = filteredFriends;
         return GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-          },
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _buildProfileHeader(user),
-              ),
-              SliverAppBar(
-                backgroundColor: Colors.white,
-                expandedHeight: 74.0, // Height of search bar + padding
-                toolbarHeight: 74.0,
-                collapsedHeight: 74.0,
-                floating: true,
-                snap: true,
-                pinned: false,
-                elevation: 0,
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.none,
-                  background: _buildFloatingSearchBar(),
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(friendListProvider);
+              ref.invalidate(friendRequestsProvider);
+              ref.invalidate(upcomingBirthdaysProvider);
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _buildProfileHeader(user),
                 ),
-              ),
-              SliverList(
-                delegate: SliverChildListDelegate(
-                  [
-                    // Recent & Related Searches - Removed
-                    if (_searchFocusNode.hasFocus && _searchQuery.isEmpty)
-                      const SizedBox.shrink(),
+                SliverAppBar(
+                  backgroundColor: Colors.white,
+                  expandedHeight: 74.0,
+                  toolbarHeight: 74.0,
+                  collapsedHeight: 74.0,
+                  floating: true,
+                  snap: true,
+                  pinned: false,
+                  elevation: 0,
+                  flexibleSpace: FlexibleSpaceBar(
+                    collapseMode: CollapseMode.none,
+                    background: _buildFloatingSearchBar(),
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildListDelegate(
+                    [
+                      const SizedBox(height: 10),
 
-                    const SizedBox(height: 10),
+                      // Group Chats Section
+                      _buildGroupChatsSection(),
 
-                    // Group Chats with + icon and collapsible
-                    Column(
-                      children: [
-                        const Divider(
-                            height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _isGroupChatExpanded = !_isGroupChatExpanded;
-                            });
-                          },
+                      // Friend Requests
+                      requestsAsync.when(
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                        data: (requests) {
+                          if (requests.isEmpty) return const SizedBox.shrink();
+                          return CollapsibleSection(
+                            title: '친구 요청',
+                            count: requests.length,
+                            child: Column(
+                              children: requests.map((request) {
+                                return FriendRequestTile(
+                                  request: {
+                                    'name': request.senderDisplayName,
+                                    'image': request.senderProfileImageUrl,
+                                    'message': '',
+                                  },
+                                  onAccept: () async {
+                                    final notifier = ref.read(friendActionProvider.notifier);
+                                    final success = await notifier.acceptFriendRequest(request.id);
+                                    if (success && mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('${request.senderDisplayName}님을 친구로 추가했습니다')),
+                                      );
+                                    }
+                                  },
+                                  onDecline: () async {
+                                    final notifier = ref.read(friendActionProvider.notifier);
+                                    final success = await notifier.rejectFriendRequest(request.id);
+                                    if (success && mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('${request.senderDisplayName}님의 친구 요청을 거절했습니다')),
+                                      );
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // Birthdays
+                      birthdaysAsync.when(
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                        data: (birthdays) {
+                          if (birthdays.isEmpty) return const SizedBox.shrink();
+                          return CollapsibleSection(
+                            title: '생일인 친구',
+                            count: birthdays.length,
+                            child: Column(
+                              children: birthdays.map((friend) {
+                                return FriendTile(
+                                  friend: _friendToMap(friend),
+                                  onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                  onFavoriteToggle: () async {
+                                    final notifier = ref.read(friendActionProvider.notifier);
+                                    await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // Friends List
+                      friendsAsync.when(
+                        loading: () => const Center(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            child: Row(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        error: (error, _) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
                               children: [
+                                const Icon(Icons.people_outline, size: 48, color: AppTheme.textSecondary),
+                                const SizedBox(height: 16),
                                 const Text(
-                                  '그룹채팅',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textPrimary,
-                                  ),
+                                  '친구 목록을 불러올 수 없습니다',
+                                  style: TextStyle(color: AppTheme.textSecondary),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${_groupChats.length}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                ),
-                                const Spacer(),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  _isGroupChatExpanded
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.keyboard_arrow_down,
-                                  color: AppTheme.textSecondary,
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () => ref.invalidate(friendListProvider),
+                                  child: const Text('다시 시도'),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        if (_isGroupChatExpanded)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 12),
-                            height: 120,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Create Group Button
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 20.0),
-                                    child: GestureDetector(
-                                      onTap: () async {
-                                        final result = await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const CreateGroupScreen(),
-                                          ),
-                                        );
+                        data: (friends) {
+                          var filteredFriends = friends.where((f) {
+                            if (_searchQuery.isEmpty) return true;
+                            return f.displayName.toLowerCase().contains(_searchQuery.toLowerCase());
+                          }).toList();
 
-                                        if (result != null &&
-                                            result is Map<String, dynamic>) {
-                                          setState(() {
-                                            _groupChats.insert(0, result);
-                                          });
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                                content: Text(
-                                                    '그룹 "${result['name']}" 생성 완료!')),
-                                          );
-                                        }
-                                      },
-                                      child: Column(
-                                        children: [
-                                          Container(
-                                            width: 64,
-                                            height: 64,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF5F5F5),
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              border: Border.all(
-                                                  color: const Color(0xFFE0E0E0)),
-                                            ),
-                                            child: const Icon(
-                                              Icons.add,
-                                              color: AppTheme.textSecondary,
-                                              size: 28,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          const Text(
-                                            '그룹 생성',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: AppTheme.textPrimary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                          if (_sortOption == 'name') {
+                            filteredFriends.sort((a, b) => a.displayName.compareTo(b.displayName));
+                          }
+
+                          // 친구가 없는 경우
+                          if (friends.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.people_outline, size: 48, color: AppTheme.textSecondary),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      '아직 친구가 없습니다',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textPrimary,
                                       ),
                                     ),
-                                  ),
-                                  // Existing Group Chats
-                                  ..._groupChats
-                                      .map((chat) => Padding(
-                                            padding:
-                                                const EdgeInsets.only(right: 20.0),
-                                            child: GroupChatTile(
-                                              name: chat['name']!,
-                                              image: chat['image'],
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        GroupChatScreen(
-                                                      groupName: chat['name']!,
-                                                      groupImage: chat['image'],
-                                                      members: List<String>.from(
-                                                          chat['members'] ?? []),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ))
-                                      .toList(),
-                                ],
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      '친구를 추가해보세요!',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    // Favorites
-                    if (favorites.isNotEmpty)
-                      CollapsibleSection(
-                        title: '즐겨찾기',
-                        count: favorites.length,
-                        child: Column(
-                          children: favorites
-                              .map((f) => FriendTile(
-                                    friend: f,
-                                    onTap: () => _navigateToProfile(f),
-                                    onFavoriteToggle: () => setState(() =>
-                                        _dataManager.toggleFavorite(f['name'])),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-
-                    // Friend Requests
-                    if (_dataManager.friendRequests.isNotEmpty)
-                      CollapsibleSection(
-                        title: '친구 요청',
-                        count: _dataManager.friendRequests.length,
-                        child: Column(
-                          children: _dataManager.friendRequests
-                              .asMap()
-                              .entries
-                              .map((entry) {
-                            final index = entry.key;
-                            final request = entry.value;
-                            return FriendRequestTile(
-                              request: request,
-                              onAccept: () {
-                                setState(() {
-                                  _dataManager.acceptFriendRequest(index);
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content:
-                                          Text('${request['name']}님을 친구로 추가했습니다')),
-                                );
-                              },
-                              onDecline: () {
-                                setState(() {
-                                  _dataManager.removeFriendRequest(index);
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(
-                                          '${request['name']}님의 친구 요청을 거절했습니다')),
-                                );
-                              },
                             );
-                          }).toList(),
-                        ),
+                          }
+
+                          final favorites = filteredFriends.where((f) => f.isFavorite).toList();
+                          final otherFriends = filteredFriends.where((f) => !f.isFavorite).toList();
+
+                          return Column(
+                            children: [
+                              // Favorites
+                              if (favorites.isNotEmpty)
+                                CollapsibleSection(
+                                  title: '즐겨찾기',
+                                  count: favorites.length,
+                                  child: Column(
+                                    children: favorites.map((friend) {
+                                      return FriendTile(
+                                        friend: _friendToMap(friend),
+                                        onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                        onFavoriteToggle: () async {
+                                          final notifier = ref.read(friendActionProvider.notifier);
+                                          await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+
+                              // All Friends
+                              CollapsibleSection(
+                                title: '친구 목록',
+                                count: otherFriends.length,
+                                child: Column(
+                                  children: otherFriends.map((friend) {
+                                    return FriendTile(
+                                      friend: _friendToMap(friend),
+                                      onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                      onFavoriteToggle: () async {
+                                        final notifier = ref.read(friendActionProvider.notifier);
+                                        await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
 
-                    // Birthdays
-                    if (birthdays.isNotEmpty)
-                      CollapsibleSection(
-                        title: '생일인 친구',
-                        count: birthdays.length,
-                        child: Column(
-                          children: birthdays
-                              .map((f) => FriendTile(
-                                    friend: f,
-                                    onTap: () => _navigateToProfile(f),
-                                    onFavoriteToggle: () => setState(() =>
-                                        _dataManager.toggleFavorite(f['name'])),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-
-                    // Friends List
-                    CollapsibleSection(
-                      title: '친구 목록',
-                      count: otherFriends.length,
-                      child: Column(
-                        children: otherFriends
-                            .map((f) => FriendTile(
-                                  friend: f,
-                                  onTap: () => _navigateToProfile(f),
-                                  onFavoriteToggle: () => setState(() =>
-                                      _dataManager.toggleFavorite(f['name'])),
-                                ))
-                            .toList(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-                  ],
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-
-  Widget _buildTeamList() {
-    final user = _dataManager.currentUser;
-    final teams = _dataManager.teams;
-    
-    final myTeams = teams.where((t) => (t['members'] as List).contains(user['name'])).toList();
-    final otherTeams = teams.where((t) => !(t['members'] as List).contains(user['name'])).toList();
-
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: _buildProfileHeader(user),
-          ),
-          SliverAppBar(
-            backgroundColor: Colors.white,
-            expandedHeight: 74.0, // Height of search bar + padding
-            toolbarHeight: 74.0,
-            collapsedHeight: 74.0,
-            floating: true,
-            snap: true,
-            pinned: false,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.none,
-              background: _buildFloatingSearchBar(),
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildListDelegate(
-              [
-                const SizedBox(height: 20),
-          
-                // My Teams Section
-                if (myTeams.isNotEmpty)
-                  CollapsibleSection(
-                    title: '내 소속',
-                    count: myTeams.length,
-                    child: Column(
-                      children: myTeams.map((team) => _buildTeamTile(team, showBorder: false)).toList(),
-                    ),
-                  ),
-
-                // Other Teams Section
-                CollapsibleSection(
-                  title: '팀 목록',
-                  count: otherTeams.length,
-                  onAdd: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AddTeamScreen(
-                          onTeamAdded: (team) {
-                            setState(() {
-                              _dataManager.addTeam(team);
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                  child: Column(
-                    children: otherTeams.map((team) => _buildTeamTile(team)).toList(),
+  Widget _buildGroupChatsSection() {
+    return Column(
+      children: [
+        const Divider(height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
+        InkWell(
+          onTap: () {
+            setState(() {
+              _isGroupChatExpanded = !_isGroupChatExpanded;
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              children: [
+                const Text(
+                  '그룹채팅',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-
-                const SizedBox(height: 40),
+                const SizedBox(width: 8),
+                Text(
+                  '${_groupChats.length}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isGroupChatExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: AppTheme.textSecondary,
+                ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        if (_isGroupChatExpanded)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            height: 120,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Create Group Button
+                  Padding(
+                    padding: const EdgeInsets.only(right: 20.0),
+                    child: GestureDetector(
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CreateGroupScreen(),
+                          ),
+                        );
+
+                        if (result != null && result is Map<String, dynamic>) {
+                          setState(() {
+                            _groupChats.insert(0, result);
+                          });
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('그룹 "${result['name']}" 생성 완료!')),
+                            );
+                          }
+                        }
+                      },
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              color: AppTheme.textSecondary,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '그룹 생성',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Existing Group Chats
+                  ..._groupChats.map((chat) => Padding(
+                    padding: const EdgeInsets.only(right: 20.0),
+                    child: GroupChatTile(
+                      name: chat['name']!,
+                      image: chat['image'],
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => GroupChatScreen(
+                              groupName: chat['name']!,
+                              groupImage: chat['image'],
+                              members: List<String>.from(chat['members'] ?? []),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )).toList(),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTeamList() {
+    final profileAsync = ref.watch(myProfileProvider);
+    final teamsAsync = ref.watch(teamListProvider);
+
+    return profileAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('오류: $error')),
+      data: (profile) {
+        final user = profile != null
+            ? {
+                'name': profile.displayName,
+                'statusMessage': profile.statusMessage ?? '상태 메시지를 설정하세요',
+                'image': profile.profileImageUrl,
+                'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
+              }
+            : {
+                'name': '사용자',
+                'statusMessage': '상태 메시지를 설정하세요',
+                'image': null,
+                'avatar': '?',
+              };
+
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(teamListProvider);
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _buildProfileHeader(user),
+                ),
+                SliverAppBar(
+                  backgroundColor: Colors.white,
+                  expandedHeight: 74.0,
+                  toolbarHeight: 74.0,
+                  collapsedHeight: 74.0,
+                  floating: true,
+                  snap: true,
+                  pinned: false,
+                  elevation: 0,
+                  flexibleSpace: FlexibleSpaceBar(
+                    collapseMode: CollapseMode.none,
+                    background: _buildFloatingSearchBar(),
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildListDelegate(
+                    [
+                      const SizedBox(height: 20),
+
+                      teamsAsync.when(
+                        loading: () => const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        error: (error, _) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                const Icon(Icons.groups_outlined, size: 48, color: AppTheme.textSecondary),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  '팀 목록을 불러올 수 없습니다',
+                                  style: TextStyle(color: AppTheme.textSecondary),
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () => ref.invalidate(teamListProvider),
+                                  child: const Text('다시 시도'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        data: (teams) {
+                          // 팀이 없는 경우
+                          if (teams.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.groups_outlined, size: 48, color: AppTheme.textSecondary),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      '가입한 팀이 없습니다',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      '팀을 만들거나 초대를 받아보세요!',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          var filteredTeams = teams.where((t) {
+                            if (_searchQuery.isEmpty) return true;
+                            return t.name.toLowerCase().contains(_searchQuery.toLowerCase());
+                          }).toList();
+
+                          if (_sortOption == 'name') {
+                            filteredTeams.sort((a, b) => a.name.compareTo(b.name));
+                          }
+
+                          return CollapsibleSection(
+                            title: '팀 목록',
+                            count: filteredTeams.length,
+                            onAdd: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddTeamScreen(
+                                    onTeamAdded: (team) {
+                                      ref.invalidate(teamListProvider);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              children: filteredTeams.map((team) => _buildTeamTile(team)).toList(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -718,7 +789,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ProfileScreen(user: user),
+              builder: (context) => const EditAgoraProfileScreen(),
             ),
           );
         },
@@ -789,9 +860,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: TextField(
           focusNode: _searchFocusNode,
           onChanged: (value) => setState(() => _searchQuery = value),
-          onSubmitted: (value) {
-            // Search logic if needed
-          },
           decoration: const InputDecoration(
             hintText: '검색',
             prefixIcon: Icon(Icons.search, color: AppTheme.textSecondary),
@@ -807,7 +875,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildTeamTile(Map<String, dynamic> team, {bool showBorder = true}) {
+  Widget _buildTeamTile(dynamic team, {bool showBorder = true}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -823,11 +891,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             context,
             MaterialPageRoute(
               builder: (context) => TeamDetailScreen(
-                teamName: team['name'],
-                teamIcon: team['icon'] ?? '🛡️',
-                members: List<String>.from(team['members'] ?? []),
-                teamImage: team['image'] ??
-                    'https://picsum.photos/seed/${team['name']}/200/200',
+                teamName: team.name,
+                teamIcon: '🛡️',
+                members: [], // Will be loaded from API
+                teamImage: team.profileImageUrl ??
+                    'https://picsum.photos/seed/${team.name}/200/200',
               ),
             ),
           );
@@ -837,18 +905,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20), // Rounded square
+            borderRadius: BorderRadius.circular(20),
             image: DecorationImage(
               image: NetworkImage(
-                team['image'] ??
-                    'https://picsum.photos/seed/${team['name']}/200/200',
+                team.profileImageUrl ??
+                    'https://picsum.photos/seed/${team.name}/200/200',
               ),
               fit: BoxFit.cover,
             ),
           ),
         ),
         title: Text(
-          team['name'],
+          team.name,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -858,7 +926,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Text(
-            team['member'] ?? '${(team['members'] as List).length}명',
+            team.description ?? '${team.memberCount ?? 0}명',
             style: const TextStyle(
               fontSize: 14,
               color: AppTheme.textSecondary,
@@ -869,13 +937,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Map<String, dynamic> _friendToMap(dynamic friend) {
+    return {
+      'id': friend.id,
+      'name': friend.displayName,
+      'image': friend.profileImageUrl,
+      'avatar': friend.displayName.isNotEmpty ? friend.displayName[0] : '?',
+      'statusMessage': friend.statusMessage ?? '',
+      'isOnline': friend.isOnline,
+      'isFavorite': friend.isFavorite,
+      'isBirthday': false, // Will be set from birthdays provider
+    };
+  }
+
   void _navigateToProfile(Map<String, dynamic> friend) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileScreen(
-          user: friend,
-        ),
+        builder: (context) => ProfileScreen(user: friend),
       ),
     );
   }

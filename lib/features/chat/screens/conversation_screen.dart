@@ -9,50 +9,59 @@ import 'dart:typed_data';
 import 'dart:async';
 import '../../../core/utils/file_download_helper.dart';
 import '../widgets/voice_recorder_dialog.dart';
-import '../models/chat_message.dart';
+import '../models/chat_message.dart' as local;
 import '../widgets/message_bubble.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'media_gallery_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/chat_provider.dart';
+import '../../../services/websocket_service.dart';
+import '../../../data/models/chat/chat.dart';
 
-class ConversationScreen extends StatefulWidget {
+class ConversationScreen extends ConsumerStatefulWidget {
+  final String chatId;
   final String userName;
   final String userImage;
   final bool isTeam;
 
   const ConversationScreen({
     Key? key,
+    required this.chatId,
     required this.userName,
     required this.userImage,
     this.isTeam = false,
   }) : super(key: key);
 
   @override
-  State<ConversationScreen> createState() => _ConversationScreenState();
+  ConsumerState<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final List<ChatMessage> _messages = [];
+  final List<local.ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
   bool _showSearch = false;
-  List<ChatMessage> _searchResults = [];
+  List<local.ChatMessage> _searchResults = [];
   List<XFile> _selectedImages = []; // Changed from single to list
   List<PlatformFile> _selectedFiles = []; // Changed from single to list
   String? _selectedVoiceMemo;
   int _voiceMemoDuration = 0;
-  
+
   // 음성 메모 미리보기 재생용
   final AudioPlayer _previewAudioPlayer = AudioPlayer();
   bool _isPreviewPlaying = false;
   Duration _previewCurrentPosition = Duration.zero;
   Duration _previewTotalDuration = Duration.zero;
 
+  // WebSocket 연결 여부
+  bool _isWebSocketInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    
+
     // 미리보기 오디오 플레이어 리스너 설정
     _previewAudioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -86,29 +95,42 @@ class _ConversationScreenState extends State<ConversationScreen> {
         });
       }
     });
-    
-    // Dummy messages
-    _messages.addAll([
-      ChatMessage(
-        text: "안녕하세요! 오늘 일정 확인하셨나요?",
-        isMe: false,
-        time: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      ChatMessage(
-        text: "네, 확인했습니다. 2시에 회의 맞죠?",
-        isMe: true,
-        time: DateTime.now().subtract(const Duration(minutes: 4)),
-      ),
-      ChatMessage(
-        text: "네 맞습니다. 회의실 A에서 뵙겠습니다.",
-        isMe: false,
-        time: DateTime.now().subtract(const Duration(minutes: 3)),
-      ),
-    ]);
+
+    // WebSocket 연결 및 채팅방 구독 (WidgetsBinding 이후)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeWebSocket();
+      // 화면 진입 시 읽음 처리
+      _markAsRead();
+    });
+  }
+
+  void _initializeWebSocket() {
+    if (_isWebSocketInitialized) return;
+
+    final wsService = ref.read(webSocketServiceProvider);
+
+    // WebSocket 연결 (이미 연결되어 있으면 무시됨)
+    wsService.connect();
+
+    // 채팅방 구독
+    wsService.subscribeToChatRoom(widget.chatId);
+
+    _isWebSocketInitialized = true;
+  }
+
+  void _markAsRead() {
+    // 메시지 읽음 처리
+    ref.read(messageListProvider(widget.chatId).notifier).markAsRead();
   }
 
   @override
   void dispose() {
+    // WebSocket 구독 해제
+    if (_isWebSocketInitialized) {
+      final wsService = ref.read(webSocketServiceProvider);
+      wsService.unsubscribeFromChatRoom(widget.chatId);
+    }
+
     _previewAudioPlayer.dispose();
     _messageController.dispose();
     _searchController.dispose();
@@ -120,74 +142,49 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (text.trim().isEmpty && _selectedImages.isEmpty && _selectedFiles.isEmpty && _selectedVoiceMemo == null) return;
 
     try {
-      // Convert multiple images to bytes
-      List<Uint8List>? imageBytesList;
-      if (_selectedImages.isNotEmpty) {
-        imageBytesList = [];
-        for (var image in _selectedImages) {
-          final bytes = await image.readAsBytes();
-          imageBytesList.add(bytes);
-          print('📸 Image processed: ${bytes.length} bytes');
-        }
-        print('📸 Total images processed: ${imageBytesList.length}');
+      // TODO: 파일 업로드 구현 필요
+      // 현재는 텍스트 메시지만 WebSocket으로 전송
+      List<String>? fileIds;
+
+      // 이미지나 파일이 있는 경우 파일 업로드 서비스 호출 필요
+      if (_selectedImages.isNotEmpty || _selectedFiles.isNotEmpty) {
+        // 파일 업로드 후 fileIds 획득
+        // fileIds = await _uploadFiles();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('파일 업로드 기능은 준비 중입니다.')),
+        );
       }
 
-      // Convert multiple files to a list
-      List<Map<String, dynamic>>? filesList;
-      if (_selectedFiles.isNotEmpty) {
-        filesList = [];
-        for (var file in _selectedFiles) {
-          Uint8List? fileBytes;
-          if (file.bytes != null) {
-            fileBytes = file.bytes;
-          } else if (file.path != null) {
-            fileBytes = await File(file.path!).readAsBytes();
-          }
-          
-          filesList.add({
-            'name': file.name,
-            'size': file.size,
-            'path': file.path,
-            'bytes': fileBytes,
-          });
-          print('📎 File processed: ${file.name}, ${file.size} bytes');
-        }
-        print('📎 Total files processed: ${filesList.length}');
+      // 메시지 타입 결정
+      MessageType messageType = MessageType.text;
+      String messageContent = text.trim().isEmpty ? "음성 메모" : text;
+
+      if (_selectedVoiceMemo != null) {
+        // 음성 메모의 경우 파일 업로드 후 FILE 타입으로 전송
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('음성 메모 업로드 기능은 준비 중입니다.')),
+        );
+      } else if (_selectedImages.isNotEmpty) {
+        messageType = MessageType.image;
+      } else if (_selectedFiles.isNotEmpty) {
+        messageType = MessageType.file;
       }
 
+      // WebSocket으로 메시지 전송
+      final notifier = ref.read(messageListProvider(widget.chatId).notifier);
+      notifier.sendMessage(
+        content: messageContent,
+        type: messageType,
+        fileIds: fileIds,
+      );
+
+      // 입력 필드 초기화
       _messageController.clear();
       setState(() {
-        print('📤 Sending message: images=${imageBytesList?.length}, files=${filesList?.length}, voice=${_selectedVoiceMemo}');
-        _messages.insert(
-            0,
-            ChatMessage(
-              text: _selectedVoiceMemo != null ? "음성 메모" : text,
-              isMe: true,
-              time: DateTime.now(),
-              imageBytesList: imageBytesList,
-              filesList: filesList,
-              audioPath: _selectedVoiceMemo,
-              audioDuration: _selectedVoiceMemo != null ? Duration(seconds: _voiceMemoDuration) : null,
-            ));
         _selectedImages = [];
         _selectedFiles = [];
         _selectedVoiceMemo = null;
         _voiceMemoDuration = 0;
-      });
-
-      // Auto-reply simulation
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          setState(() {
-            _messages.insert(
-                0,
-                ChatMessage(
-                  text: "자동 응답입니다. 잠시 후 다시 연락드리겠습니다.",
-                  isMe: false,
-                  time: DateTime.now(),
-                ));
-          });
-        }
       });
     } catch (e) {
       print('❌ Error sending message: $e');
@@ -291,8 +288,116 @@ class _ConversationScreenState extends State<ConversationScreen> {
     });
   }
 
+  /// API ChatMessage를 local ChatMessage로 변환
+  local.ChatMessage _convertToLocalMessage(ChatMessage apiMessage, String currentUserId) {
+    return local.ChatMessage(
+      text: apiMessage.content,
+      isMe: apiMessage.senderAgoraId == currentUserId,
+      time: apiMessage.createdAt,
+      sender: apiMessage.senderDisplayName,
+      // TODO: 첨부파일 처리
+      // imageUrl: apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('image'))?.fileUrl,
+      // fileName: apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image'))?.fileName,
+    );
+  }
+
+  /// 메시지 목록 빌드
+  Widget _buildMessageList() {
+    final messageState = ref.watch(messageListProvider(widget.chatId));
+
+    // 로딩 중
+    if (messageState.isLoading && messageState.messages.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    // 에러 발생
+    if (messageState.error != null && messageState.messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              messageState.error!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                ref.read(messageListProvider(widget.chatId).notifier).loadMessages();
+              },
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 메시지 목록 표시
+    final messages = messageState.messages;
+
+    // TODO: currentUserId는 실제로는 프로필 Provider에서 가져와야 함
+    const currentUserId = 'me'; // 임시값
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification scrollInfo) {
+        // 스크롤이 맨 아래에 도달하면 더 불러오기
+        if (!messageState.isLoading &&
+            messageState.hasMore &&
+            scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+          ref.read(messageListProvider(widget.chatId).notifier).loadMessages(loadMore: true);
+        }
+        return false;
+      },
+      child: ListView.builder(
+        reverse: true,
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        itemCount: messages.length + (messageState.hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          // 더 불러오기 인디케이터
+          if (index == messages.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final apiMessage = messages[index];
+          final localMessage = _convertToLocalMessage(apiMessage, currentUserId);
+
+          return MessageBubble(
+            key: ValueKey(apiMessage.id),
+            message: localMessage.text,
+            isMe: localMessage.isMe,
+            time: localMessage.time,
+            userImage: widget.userImage,
+            senderName: localMessage.sender ?? widget.userName,
+            imageUrl: localMessage.imageUrl,
+            fileName: localMessage.fileName,
+            fileSize: localMessage.fileSize,
+            reactions: localMessage.reactions,
+            onReactionSelected: (emoji) {
+              // TODO: 리액션 API 연동
+              print('Reaction selected: $emoji for message ${apiMessage.id}');
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // WebSocket 연결 상태 감지
+    final connectionState = ref.watch(webSocketConnectionStateProvider);
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
@@ -329,27 +434,55 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   : null,
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.userName,
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (widget.isTeam)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Team',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
+                    widget.userName,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-              ],
+                  if (widget.isTeam)
+                    Text(
+                      'Team',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
             ),
+            // WebSocket 연결 상태 표시
+            connectionState.when(
+              data: (state) {
+                switch (state) {
+                  case WebSocketConnectionState.connected:
+                    return const Icon(Icons.circle, color: Colors.green, size: 12);
+                  case WebSocketConnectionState.connecting:
+                    return const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  case WebSocketConnectionState.error:
+                    return const Icon(Icons.circle, color: Colors.red, size: 12);
+                  default:
+                    return const Icon(Icons.circle, color: Colors.grey, size: 12);
+                }
+              },
+              loading: () => const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              error: (_, __) => const Icon(Icons.circle, color: Colors.red, size: 12),
+            ),
+            const SizedBox(width: 8),
           ],
         ),
         actions: [
@@ -520,11 +653,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         size: 14, color: AppTheme.textSecondary),
                     onTap: () {
                       Navigator.pop(context);
+                      // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
+                      // 현재는 local ChatMessage 모델을 사용하므로 임시로 빈 리스트 전달
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => MediaGalleryScreen(
-                            messages: _messages,
+                            messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                             initialTabIndex: 0,
                           ),
                         ),
@@ -532,32 +667,31 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     },
                   ),
                   // Media Preview Section
-                  Builder(
-                    builder: (context) {
-                      // Collect all images from both imageBytes and imageBytesList
-                      final List<Uint8List> allImages = [];
-                      
-                      for (var message in _messages) {
-                        if (message.imageBytesList != null && message.imageBytesList!.isNotEmpty) {
-                          allImages.addAll(message.imageBytesList!);
-                        } else if (message.imageBytes != null) {
-                          allImages.add(message.imageBytes!);
-                        }
-                      }
-                      
-                      if (allImages.isEmpty) {
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final messageState = ref.watch(messageListProvider(widget.chatId));
+
+                      // API 메시지에서 이미지 첨부파일 필터링
+                      final imageAttachments = messageState.messages
+                          .where((msg) => msg.attachments != null)
+                          .expand((msg) => msg.attachments!)
+                          .where((att) => att.mimeType.startsWith('image'))
+                          .take(5)
+                          .toList();
+
+                      if (imageAttachments.isEmpty) {
                         return const SizedBox.shrink();
                       }
-                      
+
                       return Container(
                         padding: const EdgeInsets.all(16),
                         child: SizedBox(
                           height: 100,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: allImages.take(5).length,
+                            itemCount: imageAttachments.length,
                             itemBuilder: (context, index) {
-                              final imageBytes = allImages[index];
+                              final attachment = imageAttachments[index];
                               return GestureDetector(
                                 onTap: () {
                                   Navigator.pop(context);
@@ -565,10 +699,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => Scaffold(
-                                        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+                                        appBar: AppBar(
+                                          backgroundColor: Colors.black,
+                                          iconTheme: const IconThemeData(color: Colors.white),
+                                        ),
                                         backgroundColor: Colors.black,
                                         body: Center(
-                                          child: Image.memory(imageBytes),
+                                          child: Image.network(attachment.fileUrl),
                                         ),
                                       ),
                                     ),
@@ -580,7 +717,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     image: DecorationImage(
-                                      image: MemoryImage(imageBytes),
+                                      image: NetworkImage(
+                                        attachment.thumbnailUrl ?? attachment.fileUrl,
+                                      ),
                                       fit: BoxFit.cover,
                                     ),
                                   ),
@@ -600,11 +739,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         size: 14, color: AppTheme.textSecondary),
                     onTap: () {
                       Navigator.pop(context);
+                      // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => MediaGalleryScreen(
-                            messages: _messages,
+                            messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                             initialTabIndex: 1,
                           ),
                         ),
@@ -619,11 +759,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         size: 14, color: AppTheme.textSecondary),
                     onTap: () {
                       Navigator.pop(context);
+                      // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => MediaGalleryScreen(
-                            messages: _messages,
+                            messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                             initialTabIndex: 2,
                           ),
                         ),
@@ -716,89 +857,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
             ),
           Expanded(
-            child: _searchResults.isNotEmpty
-                ? ListView.builder(
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 20),
-                    itemCount: _searchResults.length,
-                    itemBuilder: (context, index) {
-                      final message = _searchResults[index];
-                      return MessageBubble(
-                        key: ValueKey('${message.time}_${message.text}'),
-                        message: message.text,
-                        isMe: message.isMe,
-                        time: message.time,
-                        userImage: widget.userImage,
-                        senderName: widget.userName,
-                        imageBytes: message.imageBytes,
-                        imageBytesList: message.imageBytesList,
-                        imageUrl: message.imageUrl,
-                        fileName: message.fileName,
-                        fileSize: message.fileSize,
-                        filePath: message.filePath,
-                        fileBytes: message.fileBytes,
-                        filesList: message.filesList,
-                        audioPath: message.audioPath,
-                        audioDuration: message.audioDuration,
-                        reactions: message.reactions,
-                        onReactionSelected: (emoji) {
-                          setState(() {
-                            if (index >= 0 && index < _searchResults.length) {
-                              final updatedMessage = _searchResults[index].copyWith(
-                                reactions: List.from(_searchResults[index].reactions)..add(emoji),
-                              );
-                              _searchResults[index] = updatedMessage;
-                              
-                              final originalIndex = _messages.indexWhere((m) => m.time == message.time && m.text == message.text);
-                              if (originalIndex != -1) {
-                                _messages[originalIndex] = updatedMessage;
-                              }
-                            }
-                          });
-                        },
-                      );
-                    },
-                  )
-                : ListView.builder(
-                    reverse: true,
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 20),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      return MessageBubble(
-                        key: ValueKey('${message.time}_${message.text}'),
-                        message: message.text,
-                        isMe: message.isMe,
-                        time: message.time,
-                        userImage: widget.userImage,
-                        senderName: widget.userName,
-                        imageBytes: message.imageBytes,
-                        imageBytesList: message.imageBytesList,
-                        imageUrl: message.imageUrl,
-                        fileName: message.fileName,
-                        fileSize: message.fileSize,
-                        filePath: message.filePath,
-                        fileBytes: message.fileBytes,
-                        filesList: message.filesList,
-                        audioPath: message.audioPath,
-                        audioDuration: message.audioDuration,
-                        reactions: message.reactions,
-                        onReactionSelected: (emoji) {
-                          setState(() {
-                            if (index >= 0 && index < _messages.length) {
-                              final updatedMessage = _messages[index].copyWith(
-                                reactions: List.from(_messages[index].reactions)..add(emoji),
-                              );
-                              _messages[index] = updatedMessage;
-                            }
-                          });
-                        },
-                      );
-                    },
-                  ),
+            child: _buildMessageList(),
           ),
           _buildInputArea(),
         ],
@@ -990,11 +1049,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 Navigator.pop(context);
+                // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => MediaGalleryScreen(
-                      messages: _messages,
+                      messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                       initialTabIndex: 0,
                     ),
                   ),
@@ -1007,11 +1067,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 Navigator.pop(context);
+                // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => MediaGalleryScreen(
-                      messages: _messages,
+                      messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                       initialTabIndex: 1,
                     ),
                   ),
@@ -1024,11 +1085,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 Navigator.pop(context);
+                // TODO: MediaGalleryScreen을 API 메시지와 호환되도록 수정 필요
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => MediaGalleryScreen(
-                      messages: _messages,
+                      messages: [], // TODO: API 메시지를 local 메시지로 변환 필요
                       initialTabIndex: 2,
                     ),
                   ),
