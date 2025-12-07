@@ -4,11 +4,47 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/theme.dart';
 import '../../shared/providers/auth_provider.dart';
 
-class LoginScreen extends ConsumerWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱이 포그라운드로 돌아왔을 때
+    if (state == AppLifecycleState.resumed) {
+      final authState = ref.read(authProvider);
+      // 인증 진행 중이었다면 잠시 후 취소 (딥링크 처리 시간 허용)
+      if (authState.status == AuthStatus.authenticating) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!mounted) return;
+          final currentState = ref.read(authProvider);
+          if (currentState.status == AuthStatus.authenticating) {
+            ref.read(authProvider.notifier).cancelOAuthLogin();
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.authenticating;
     final hasError = authState.status == AuthStatus.error;

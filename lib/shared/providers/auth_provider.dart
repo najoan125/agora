@@ -190,6 +190,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// OAuth 로그인 취소 (브라우저 닫힘 등)
+  void cancelOAuthLogin() {
+    if (state.status == AuthStatus.authenticating) {
+      _oauthService.cancelOAuthLogin();
+      state = AuthState.unauthenticated();
+    }
+  }
+
   /// 인증 상태 새로고침
   Future<void> refresh() async {
     await _initialize();

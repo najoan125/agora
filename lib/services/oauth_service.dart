@@ -54,6 +54,25 @@ class OAuthService {
     _linkSubscription = null;
   }
 
+  /// OAuth 로그인 취소 (브라우저 닫힘 등)
+  void cancelOAuthLogin() {
+    if (_authCompleter != null && !_authCompleter!.isCompleted) {
+      _authCompleter!.completeError(
+        AppException.oauth(
+          message: 'OAuth cancelled',
+          userMessage: '로그인이 취소되었습니다.',
+        ),
+      );
+    }
+    // PKCE 코드 정리
+    SecureStorageManager.deleteCodeVerifier();
+    SecureStorageManager.deleteOAuthState();
+  }
+
+  /// OAuth 진행 중인지 확인
+  bool get isOAuthInProgress =>
+      _authCompleter != null && !_authCompleter!.isCompleted;
+
   /// OAuth 로그인 시작
   Future<OAuthResult> startOAuthLogin() async {
     // PKCE 코드 생성
@@ -78,7 +97,7 @@ class OAuthService {
     if (await canLaunchUrl(uri)) {
       await launchUrl(
         uri,
-        mode: LaunchMode.externalApplication,
+        mode: LaunchMode.inAppBrowserView,
       );
     } else {
       _authCompleter?.completeError(
