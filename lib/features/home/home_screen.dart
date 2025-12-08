@@ -457,7 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                         onTap: () => _navigateToProfile(_friendToMap(friend)),
                                         onFavoriteToggle: () async {
                                           final notifier = ref.read(friendActionProvider.notifier);
-                                          await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                          await notifier.toggleFavorite(friend.id.toString(), friend.isFavorite);
                                         },
                                       );
                                     }).toList(),
@@ -475,7 +475,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                       onTap: () => _navigateToProfile(_friendToMap(friend)),
                                       onFavoriteToggle: () async {
                                         final notifier = ref.read(friendActionProvider.notifier);
-                                        await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                        await notifier.toggleFavorite(friend.id.toString(), friend.isFavorite);
                                       },
                                     );
                                   }).toList(),
