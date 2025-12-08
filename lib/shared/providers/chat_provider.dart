@@ -19,7 +19,7 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
 
 /// WebSocket 연결 상태 Provider
 final webSocketConnectionStateProvider =
-    StreamProvider<WebSocketConnectionState>((ref) {
+    StreamProvider.autoDispose<WebSocketConnectionState>((ref) {
   final service = ref.watch(webSocketServiceProvider);
   return service.connectionState;
 });
