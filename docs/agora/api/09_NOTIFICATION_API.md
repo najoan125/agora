@@ -24,6 +24,7 @@ Authorization: Bearer {access_token}
     "title": "친구 요청",
     "content": "John Doe님이 친구 요청을 보냈습니다",
     "relatedId": 100,
+    "relatedType": "USER",
     "isRead": false,
     "createdAt": "2025-01-15T10:30:00"
   },
@@ -33,6 +34,7 @@ Authorization: Bearer {access_token}
     "title": "새 메시지",
     "content": "John Doe: 안녕하세요!",
     "relatedId": 200,
+    "relatedType": "CHAT",
     "isRead": true,
     "createdAt": "2025-01-15T10:35:00"
   }
@@ -67,7 +69,14 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
-  "message": "알림이 읽음 처리되었습니다"
+  "notificationId": 1,
+  "type": "FRIEND_REQUEST",
+  "title": "친구 요청",
+  "content": "John Doe님이 친구 요청을 보냈습니다",
+  "relatedId": 100,
+  "relatedType": "USER",
+  "isRead": true,
+  "createdAt": "2025-01-15T10:30:00"
 }
 ```
 
@@ -114,7 +123,7 @@ Content-Type: application/json
 
 {
   "token": "fcm_token_xyz...",
-  "deviceName": "iPhone 13",
+  "deviceId": "device_id_123",
   "deviceType": "iOS"
 }
 ```
@@ -131,14 +140,14 @@ Content-Type: application/json
 ## 7. DELETE /fcm-token - FCM 토큰 삭제
 
 ```http
-DELETE /api/agora/notifications/fcm-token
+DELETE /api/agora/notifications/fcm-token?token=fcm_token_xyz...
 Authorization: Bearer {access_token}
-Content-Type: application/json
-
-{
-  "token": "fcm_token_xyz..."
-}
 ```
+
+### Query Parameters
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| token | string | Yes | 삭제할 FCM 토큰 |
 
 ### Response 200
 ```json

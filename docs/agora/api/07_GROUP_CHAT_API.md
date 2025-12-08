@@ -1,12 +1,146 @@
 # 그룹 채팅 API
 
 ## Base URL
-`/api/agora/chats/groups`
+- 기존: `/api/agora/chats/groups`
+- 신규: `/api/agora/chats/group`
 
 ## 인증
 Bearer Token (OAuth 2.0)
 
 ---
+
+## ChatContext 설명
+
+그룹 채팅도 **컨텍스트(Context)**에 따라 구분됩니다:
+
+| Context | 설명 | 생성 방식 |
+|---------|------|-----------|
+| `FRIEND` | 친구 그룹 채팅 | 사용자가 직접 생성 |
+| `TEAM` | 팀 그룹 채팅 | 팀 생성 시 자동 생성 |
+
+---
+
+# 신규 API (Context 기반)
+
+## POST /group - 친구 그룹 채팅 생성
+
+친구들과의 그룹 채팅을 생성합니다.
+
+### Request
+```http
+POST /api/agora/chats/group
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "name": "친구 모임",
+  "profileImage": "https://cdn.hyfata.com/groups/friends.jpg",
+  "memberAgoraIds": ["john_doe", "jane_smith"]
+}
+```
+
+### Request (userId로 멤버 지정)
+```http
+POST /api/agora/chats/group
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+{
+  "name": "친구 모임",
+  "profileImage": "https://cdn.hyfata.com/groups/friends.jpg",
+  "memberUserIds": [123, 456]
+}
+```
+
+### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | Yes | 채팅방 이름 |
+| profileImage | string | No | 채팅방 이미지 URL |
+| memberAgoraIds | array | 둘 중 하나 필수 | 초대할 멤버 아고라 ID 목록 |
+| memberUserIds | array | 둘 중 하나 필수 | 초대할 멤버 사용자 ID 목록 |
+| context | string | No | 컨텍스트 (기본값: `FRIEND`) |
+
+### Response 200
+```json
+{
+  "chatId": 200,
+  "type": "GROUP",
+  "context": "FRIEND",
+  "displayName": "친구 모임",
+  "displayImage": "https://cdn.hyfata.com/groups/friends.jpg",
+  "name": "친구 모임",
+  "profileImage": "https://cdn.hyfata.com/groups/friends.jpg",
+  "teamId": null,
+  "teamName": null,
+  "participantCount": 3,
+  "participants": [
+    {
+      "userId": 100,
+      "displayName": "나",
+      "profileImage": "https://cdn.hyfata.com/profiles/me.jpg",
+      "identifier": "my_agora_id"
+    },
+    {
+      "userId": 123,
+      "displayName": "홍길동",
+      "profileImage": "https://cdn.hyfata.com/profiles/user123.jpg",
+      "identifier": "john_doe"
+    },
+    {
+      "userId": 456,
+      "displayName": "김철수",
+      "profileImage": "https://cdn.hyfata.com/profiles/user456.jpg",
+      "identifier": "jane_smith"
+    }
+  ],
+  "otherParticipant": null,
+  "lastMessageAt": null,
+  "createdAt": "2025-01-15T10:30:00",
+  "updatedAt": "2025-01-15T10:30:00"
+}
+```
+
+### Error Responses
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | INVALID_NAME | 채팅방 이름이 유효하지 않습니다 |
+| 400 | NO_MEMBERS | 최소 1명의 멤버를 지정해야 합니다 |
+| 404 | USER_NOT_FOUND | 지정된 멤버를 찾을 수 없습니다 |
+
+---
+
+## GET /group - 그룹 채팅 목록 조회
+
+사용자의 친구 그룹 채팅 목록을 조회합니다 (팀 그룹 채팅 제외).
+
+### Request
+```http
+GET /api/agora/chats/group
+Authorization: Bearer {access_token}
+```
+
+### Response 200
+```json
+[
+  {
+    "chatId": 200,
+    "type": "GROUP",
+    "context": "FRIEND",
+    "displayName": "친구 모임",
+    "displayImage": "https://cdn.hyfata.com/groups/friends.jpg",
+    "name": "친구 모임",
+    "profileImage": "https://cdn.hyfata.com/groups/friends.jpg",
+    "participantCount": 5,
+    "lastMessageAt": "2025-01-15T10:30:00",
+    "createdAt": "2025-01-10T15:30:00"
+  }
+]
+```
+
+---
+
+# 기존 API (하위 호환)
 
 ## 1. POST / - 그룹 생성
 
@@ -24,14 +158,10 @@ Content-Type: application/json
 ### Response 200
 ```json
 {
-  "groupChatId": 101,
+  "chatId": 101,
   "name": "개발팀 채팅",
-  "creatorEmail": "admin@example.com",
-  "memberCount": 3,
-  "members": [
-    { "userId": 100, "email": "admin@example.com", "agoraId": "admin" },
-    { "userId": 101, "email": "john@example.com", "agoraId": "john_doe" }
-  ],
+  "creatorAgoraId": "admin",
+  "memberAgoraIds": ["admin", "john_doe"],
   "createdAt": "2025-01-15T10:30:00"
 }
 ```
@@ -48,14 +178,10 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
-  "groupChatId": 101,
+  "chatId": 101,
   "name": "개발팀 채팅",
-  "creatorEmail": "admin@example.com",
-  "memberCount": 3,
-  "members": [
-    { "userId": 100, "email": "admin@example.com", "agoraId": "admin", "role": "admin" },
-    { "userId": 101, "email": "john@example.com", "agoraId": "john_doe", "role": "member" }
-  ],
+  "creatorAgoraId": "admin",
+  "memberAgoraIds": ["admin", "john_doe"],
   "createdAt": "2025-01-15T10:30:00"
 }
 ```
@@ -79,10 +205,11 @@ Content-Type: application/json
 ### Response 200
 ```json
 {
-  "groupChatId": 101,
+  "chatId": 101,
   "name": "개발팀 공용 채팅",
-  "creatorEmail": "admin@example.com",
-  "memberCount": 3,
+  "creatorAgoraId": "admin",
+  "memberAgoraIds": ["admin", "john_doe"],
+  "createdAt": "2025-01-15T10:30:00",
   "updatedAt": "2025-01-15T11:00:00"
 }
 ```
@@ -104,8 +231,12 @@ Content-Type: application/json
 ### Response 200
 ```json
 {
-  "message": "멤버가 추가되었습니다",
-  "addedCount": 2
+  "chatId": 101,
+  "name": "개발팀 채팅",
+  "creatorAgoraId": "admin",
+  "memberAgoraIds": ["admin", "john_doe", "new_user", "another_user"],
+  "createdAt": "2025-01-15T10:30:00",
+  "updatedAt": "2025-01-15T11:30:00"
 }
 ```
 

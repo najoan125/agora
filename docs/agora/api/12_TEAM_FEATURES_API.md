@@ -26,7 +26,8 @@ Authorization: Bearer {access_token}
     "title": "공지사항",
     "content": "내용",
     "isPinned": true,
-    "createdAt": "2025-01-10T10:00:00"
+    "createdAt": "2025-01-10T10:00:00",
+    "updatedAt": "2025-01-15T10:00:00"
   }
 ]
 ```
@@ -96,7 +97,8 @@ Authorization: Bearer {access_token}
     "priority": "HIGH",
     "dueDate": "2025-01-20T23:59:59",
     "completedAt": null,
-    "createdAt": "2025-01-10T10:00:00"
+    "createdAt": "2025-01-10T10:00:00",
+    "updatedAt": "2025-01-15T10:00:00"
   }
 ]
 ```
@@ -144,8 +146,18 @@ Authorization: Bearer {access_token}
 **응답:**
 ```json
 {
+  "todoId": 1,
+  "teamId": 1,
+  "createdByEmail": "admin@example.com",
+  "assignedToEmail": "user@example.com",
+  "title": "문서 작성",
+  "description": "API 문서 작성",
   "status": "DONE",
-  "completedAt": "2025-01-15T14:30:00"
+  "priority": "HIGH",
+  "dueDate": "2025-01-20T23:59:59",
+  "completedAt": "2025-01-15T14:30:00",
+  "createdAt": "2025-01-10T10:00:00",
+  "updatedAt": "2025-01-15T14:30:00"
 }
 ```
 
@@ -181,7 +193,8 @@ Authorization: Bearer {access_token}
     "startTime": "2025-01-20T14:00:00",
     "endTime": "2025-01-20T15:00:00",
     "isAllDay": false,
-    "createdAt": "2025-01-10T10:00:00"
+    "createdAt": "2025-01-10T10:00:00",
+    "updatedAt": "2025-01-15T10:00:00"
   }
 ]
 ```

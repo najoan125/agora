@@ -69,23 +69,26 @@ Content-Type: application/json
 ## 3. PUT / - 팀 프로필 수정
 
 ```http
-PUT /api/agora/teams/1/profile
+PUT /api/agora/teams/1/profile?displayName=Kim팀장&profileImage=https://cdn.hyfata.com/teams/profiles/updated.jpg
 Authorization: Bearer {access_token}
-Content-Type: application/json
-
-{
-  "displayName": "John (Senior Developer)",
-  "profileImage": "https://cdn.hyfata.com/profiles/team_john_new.jpg"
-}
 ```
+
+### Query Parameters
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| displayName | string | No | 팀 내 표시 이름 |
+| profileImage | string | No | 프로필 이미지 URL |
 
 ### Response 200
 ```json
 {
   "profileId": 1,
   "teamId": 1,
-  "displayName": "John (Senior Developer)",
-  "profileImage": "https://cdn.hyfata.com/profiles/team_john_new.jpg",
+  "userId": 100,
+  "userEmail": "user@example.com",
+  "displayName": "Kim팀장",
+  "profileImage": "https://cdn.hyfata.com/teams/profiles/updated.jpg",
+  "createdAt": "2025-01-01T10:00:00",
   "updatedAt": "2025-01-15T11:00:00"
 }
 ```
@@ -95,22 +98,25 @@ Content-Type: application/json
 ## 4. PUT /image - 프로필 이미지 변경
 
 ```http
-PUT /api/agora/teams/1/profile/image
+PUT /api/agora/teams/1/profile/image?profileImage=https://cdn.hyfata.com/teams/profiles/new.jpg
 Authorization: Bearer {access_token}
-Content-Type: application/json
-
-{
-  "profileImage": "https://cdn.hyfata.com/profiles/team_john_avatar.jpg"
-}
 ```
+
+### Query Parameters
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| profileImage | string | Yes | 프로필 이미지 URL |
 
 ### Response 200
 ```json
 {
   "profileId": 1,
   "teamId": 1,
-  "displayName": "John (Senior Developer)",
-  "profileImage": "https://cdn.hyfata.com/profiles/team_john_avatar.jpg",
+  "userId": 100,
+  "userEmail": "user@example.com",
+  "displayName": "Kim팀장",
+  "profileImage": "https://cdn.hyfata.com/teams/profiles/new.jpg",
+  "createdAt": "2025-01-01T10:00:00",
   "updatedAt": "2025-01-15T11:05:00"
 }
 ```
@@ -123,7 +129,7 @@ Content-Type: application/json
 
 ### Request
 ```http
-GET /api/agora/teams/1/members/101
+GET /api/agora/teams/1/profile/members/100
 Authorization: Bearer {access_token}
 ```
 

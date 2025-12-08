@@ -56,8 +56,9 @@ client.subscribe(`/topic/agora/chat/{chatId}`, (message) => {
   "eventType": "MESSAGE",
   "messageId": 1000,
   "chatId": 100,
-  "senderEmail": "user@example.com",
+  "senderId": 123,
   "senderAgoraId": "john_doe",
+  "senderName": "John Doe",
   "senderProfileImage": "https://...",
   "content": "안녕하세요!",
   "type": "TEXT",
@@ -70,8 +71,9 @@ client.subscribe(`/topic/agora/chat/{chatId}`, (message) => {
 {
   "eventType": "READ",
   "chatId": 100,
-  "readerEmail": "user@example.com",
-  "readAt": "2025-01-15T10:36:00"
+  "messageId": 1000,
+  "userId": 123,
+  "userAgoraId": "john_doe"
 }
 ```
 
@@ -130,7 +132,9 @@ client.publish({
 ```javascript
 client.publish({
   destination: `/app/agora/chat/{chatId}/read`,
-  body: JSON.stringify({})
+  body: JSON.stringify({
+    messageId: 1000
+  })
 });
 ```
 

@@ -25,11 +25,14 @@ file: (바이너리 파일)
 ```json
 {
   "fileId": 1,
-  "fileName": "document.pdf",
+  "fileName": "document_abc123.pdf",
+  "originalName": "document.pdf",
+  "fileUrl": "https://cdn.hyfata.com/files/document_abc123.pdf",
+  "thumbnailUrl": null,
   "fileSize": 2048000,
   "mimeType": "application/pdf",
-  "url": "https://cdn.hyfata.com/files/document_abc123.pdf",
-  "uploadedAt": "2025-01-15T10:30:00"
+  "fileType": "DOCUMENT",
+  "createdAt": "2025-01-15T10:30:00"
 }
 ```
 
@@ -58,21 +61,23 @@ file: (이미지 바이너리)
 ```json
 {
   "fileId": 2,
-  "fileName": "profile.jpg",
+  "fileName": "profile_xyz456.jpg",
+  "originalName": "profile.jpg",
+  "fileUrl": "https://cdn.hyfata.com/files/profile_xyz456.jpg",
+  "thumbnailUrl": "https://cdn.hyfata.com/files/profile_xyz456_thumb.jpg",
   "fileSize": 512000,
   "mimeType": "image/jpeg",
-  "url": "https://cdn.hyfata.com/files/profile_abc123.jpg",
-  "thumbnailUrl": "https://cdn.hyfata.com/files/profile_abc123_thumb.jpg",
-  "uploadedAt": "2025-01-15T10:32:00"
+  "fileType": "IMAGE",
+  "createdAt": "2025-01-15T10:35:00"
 }
 ```
 
 ---
 
-## 3. GET /{fileId} - 파일 메타데이터 조회
+## 3. GET /meta/{fileId} - 파일 메타데이터 조회
 
 ```http
-GET /api/agora/files/1
+GET /api/agora/files/meta/1
 Authorization: Bearer {access_token}
 ```
 
@@ -80,18 +85,42 @@ Authorization: Bearer {access_token}
 ```json
 {
   "fileId": 1,
-  "fileName": "document.pdf",
+  "fileName": "document_abc123.pdf",
+  "originalName": "document.pdf",
+  "fileUrl": "https://cdn.hyfata.com/files/document_abc123.pdf",
+  "thumbnailUrl": null,
   "fileSize": 2048000,
   "mimeType": "application/pdf",
-  "url": "https://cdn.hyfata.com/files/document_abc123.pdf",
-  "uploadedAt": "2025-01-15T10:30:00",
-  "uploadedBy": "user@example.com"
+  "fileType": "DOCUMENT",
+  "createdAt": "2025-01-15T10:30:00"
 }
 ```
 
 ---
 
-## 4. GET /{fileId}/download - 파일 다운로드
+## 4. GET /{fileName} - 파일 서빙 (공개)
+
+업로드된 파일을 파일명으로 조회하여 다운로드합니다. 인증 없이 접근 가능합니다.
+
+### Request
+```http
+GET /api/agora/files/document_abc123.pdf
+```
+
+### Response 200
+파일 바이너리 데이터 반환
+
+### Query Parameters
+없음
+
+### 주의사항
+- 공개 접근 가능 (인증 불필요)
+- 파일명은 업로드 시 자동 생성된 고유 파일명 사용
+- Content-Type 헤더는 파일의 MIME 타입으로 설정됨
+
+---
+
+## 5. GET /{fileId}/download - 파일 다운로드
 
 ```http
 GET /api/agora/files/1/download
@@ -102,7 +131,7 @@ Authorization: Bearer {access_token}
 
 ---
 
-## 5. DELETE /{fileId} - 파일 삭제
+## 6. DELETE /{fileId} - 파일 삭제
 
 ```http
 DELETE /api/agora/files/1

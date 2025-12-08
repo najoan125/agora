@@ -185,7 +185,13 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
-  "message": "즐겨찾기에 추가되었습니다"
+  "friendId": 1,
+  "agoraId": "john_doe",
+  "displayName": "John Doe",
+  "profileImage": "https://cdn.hyfata.com/profiles/john_doe.jpg",
+  "bio": "안녕하세요!",
+  "isFavorite": true,
+  "createdAt": "2025-01-10T15:30:00"
 }
 ```
 
@@ -204,7 +210,13 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
-  "message": "즐겨찾기에서 제거되었습니다"
+  "friendId": 1,
+  "agoraId": "john_doe",
+  "displayName": "John Doe",
+  "profileImage": "https://cdn.hyfata.com/profiles/john_doe.jpg",
+  "bio": "안녕하세요!",
+  "isFavorite": false,
+  "createdAt": "2025-01-10T15:30:00"
 }
 ```
 

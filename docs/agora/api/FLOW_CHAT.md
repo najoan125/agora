@@ -103,13 +103,8 @@ Content-Type: application/json
 client.publish({
   destination: '/app/agora/chat/100/send',
   body: JSON.stringify({
-    messageId: 1000,
-    chatId: 100,
-    senderEmail: 'user@example.com',
     content: '안녕하세요!',
-    type: 'MESSAGE',
-    eventType: 'MESSAGE',
-    createdAt: '2025-01-15T10:35:00'
+    type: 'TEXT'
   })
 });
 ```
@@ -120,7 +115,9 @@ client.publish({
   "eventType": "MESSAGE",
   "messageId": 1000,
   "chatId": 100,
-  "senderEmail": "user@example.com",
+  "senderId": 123,
+  "senderAgoraId": "john_doe",
+  "senderName": "John Doe",
   "content": "안녕하세요!",
   "type": "TEXT",
   "createdAt": "2025-01-15T10:35:00"
@@ -297,13 +294,13 @@ Content-Type: application/json
 
 ### 채팅방을 폴더에 추가
 ```http
-POST /api/agora/chats/100/folder/1
+POST /api/agora/chats/folders/{folderId}/chats/{chatId}
 Authorization: Bearer {access_token}
 ```
 
 ### 채팅방을 폴더에서 제거
 ```http
-DELETE /api/agora/chats/100/folder
+DELETE /api/agora/chats/folders/{folderId}/chats/{chatId}
 Authorization: Bearer {access_token}
 ```
 

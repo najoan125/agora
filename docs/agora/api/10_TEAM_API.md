@@ -115,16 +115,16 @@ Authorization: Bearer {access_token}
 
 ### Request
 ```http
-PUT /api/agora/teams/1
+PUT /api/agora/teams/1?name=개발팀(수정)&description=백엔드및프론트엔드개발팀&profileImage=https://cdn.hyfata.com/teams/dev-team-updated.jpg
 Authorization: Bearer {access_token}
-Content-Type: application/json
-
-{
-  "name": "개발팀 (수정)",
-  "description": "백엔드 및 프론트엔드 개발 팀",
-  "profileImage": "https://cdn.hyfata.com/teams/dev-team-updated.jpg"
-}
 ```
+
+### Query Parameters
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| name | string | No | 팀 이름 |
+| description | string | No | 팀 설명 |
+| profileImage | string | No | 팀 프로필 이미지 URL |
 
 ### Response 200
 ```json
@@ -297,8 +297,80 @@ Authorization: Bearer {access_token}
 
 ---
 
+## 10. GET /{id}/chat - 팀 그룹 채팅 조회
+
+팀의 그룹 채팅방 정보를 조회합니다.
+
+### Request
+```http
+GET /api/agora/teams/1/chat
+Authorization: Bearer {access_token}
+```
+
+### Response 200
+```json
+{
+  "chatId": 300,
+  "type": "GROUP",
+  "context": "TEAM",
+  "displayName": "개발팀",
+  "displayImage": "https://cdn.hyfata.com/teams/dev-team.jpg",
+  "name": "개발팀",
+  "profileImage": "https://cdn.hyfata.com/teams/dev-team.jpg",
+  "teamId": 1,
+  "teamName": "개발팀",
+  "participantCount": 5,
+  "participants": [
+    {
+      "userId": 100,
+      "displayName": "관리자",
+      "profileImage": "https://cdn.hyfata.com/profiles/admin.jpg",
+      "identifier": null
+    },
+    {
+      "userId": 101,
+      "displayName": "김개발",
+      "profileImage": "https://cdn.hyfata.com/profiles/dev1.jpg",
+      "identifier": null
+    }
+  ],
+  "otherParticipant": null,
+  "lastMessageAt": "2025-01-15T10:30:00",
+  "createdAt": "2025-01-01T10:00:00",
+  "updatedAt": "2025-01-15T10:30:00"
+}
+```
+
+### Error Responses
+| Status | Error | Description |
+|--------|-------|-------------|
+| 404 | TEAM_NOT_FOUND | 팀을 찾을 수 없습니다 |
+| 403 | NOT_TEAM_MEMBER | 팀의 멤버가 아닙니다 |
+| 404 | CHAT_NOT_FOUND | 팀 그룹 채팅을 찾을 수 없습니다 |
+
+---
+
+## 팀 그룹 채팅 자동 관리
+
+### 자동 생성
+- 팀을 생성하면 해당 팀의 그룹 채팅이 **자동으로 생성**됩니다
+- 생성자는 자동으로 채팅 참여자로 추가됩니다
+
+### 자동 동기화
+- **멤버 추가**: 팀에 새 멤버가 추가되면 자동으로 팀 그룹 채팅에 참여자로 추가됩니다
+- **멤버 제거**: 팀에서 멤버가 제거되면 자동으로 팀 그룹 채팅에서도 제거됩니다
+
+```
+팀 생성 → TeamCreatedEvent 발행 → 팀 그룹 채팅 생성
+팀 멤버 추가 → TeamMemberAddedEvent 발행 → 채팅 참여자 추가
+팀 멤버 제거 → TeamMemberRemovedEvent 발행 → 채팅 참여자 제거
+```
+
+---
+
 ## 주의사항
 
 1. **팀 생성자**: 팀을 생성한 사용자만 팀 수정/삭제 가능
 2. **멤버 관리**: 생성자만 멤버 초대/제거/역할 변경 가능
 3. **팀 프로필**: 팀원들이 팀 내에서 사용할 프로필 설정은 별도의 팀 프로필 API 사용
+4. **팀 그룹 채팅**: 팀 생성 시 자동 생성되며, 별도로 생성/삭제 불가

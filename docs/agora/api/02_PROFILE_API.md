@@ -18,7 +18,7 @@ GET /api/agora/profile
 Authorization: Bearer {access_token}
 ```
 
-### Response 200
+### Response 200 (프로필 있음)
 ```json
 {
   "agoraId": "john_doe",
@@ -32,11 +32,18 @@ Authorization: Bearer {access_token}
 }
 ```
 
+### Response 200 (프로필 없음)
+```json
+{
+  "message": "Agora profile not found. Please create a profile first.",
+  "hasProfile": false
+}
+```
+
 ### Error Responses
 | Status | Error | Description |
 |--------|-------|-------------|
 | 401 | UNAUTHORIZED | 인증 토큰이 없거나 만료됨 |
-| 404 | PROFILE_NOT_FOUND | 프로필이 아직 생성되지 않음 |
 
 ---
 
@@ -162,11 +169,12 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
+  "userId": 123,
   "agoraId": "john_doe",
   "displayName": "John Doe",
   "profileImage": "https://cdn.hyfata.com/profiles/john_doe.jpg",
   "bio": "안녕하세요!",
-  "createdAt": "2025-01-10T15:30:00"
+  "birthday": "1990-05-15"
 }
 ```
 
@@ -191,18 +199,43 @@ Authorization: Bearer {access_token}
 
 ### Response 200
 ```json
-[
-  {
-    "agoraId": "john_doe",
-    "displayName": "John Doe",
-    "profileImage": "https://cdn.hyfata.com/profiles/john_doe.jpg"
+{
+  "content": [
+    {
+      "userId": 123,
+      "agoraId": "john_doe",
+      "displayName": "John Doe",
+      "profileImage": "https://cdn.hyfata.com/profiles/john_doe.jpg",
+      "bio": "안녕하세요!",
+      "birthday": "1990-05-15"
+    },
+    {
+      "userId": 124,
+      "agoraId": "john_smith",
+      "displayName": "John Smith",
+      "profileImage": "https://cdn.hyfata.com/profiles/john_smith.jpg",
+      "bio": "Hi there!",
+      "birthday": "1992-03-20"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10,
+    "sort": {
+      "sorted": false,
+      "empty": true,
+      "unsorted": true
+    }
   },
-  {
-    "agoraId": "john_smith",
-    "displayName": "John Smith",
-    "profileImage": "https://cdn.hyfata.com/profiles/john_smith.jpg"
-  }
-]
+  "totalPages": 5,
+  "totalElements": 50,
+  "last": false,
+  "first": true,
+  "size": 10,
+  "number": 0,
+  "numberOfElements": 10,
+  "empty": false
+}
 ```
 
 ### Query Parameters
@@ -225,6 +258,8 @@ Authorization: Bearer {access_token}
 ### Response 200
 ```json
 {
+  "agoraId": "john_doe",
+  "exists": false,
   "available": true
 }
 ```
@@ -240,8 +275,8 @@ Authorization: Bearer {access_token}
 
 | 필드 | 타입 | 요구사항 |
 |------|------|---------|
-| agoraId | string | 필수, 3-20자, 영문/숫자/언더스코어만 가능 |
-| displayName | string | 필수, 1-50자 |
+| agoraId | string | 필수, 3-50자, 영문/숫자/언더스코어만 가능, 대소문자 모두 허용 |
+| displayName | string | 필수, 1-100자 |
 | bio | string | 선택, 최대 200자 |
 | phone | string | 선택, E.164 형식 |
 | birthday | date | 선택, YYYY-MM-DD |
@@ -251,6 +286,6 @@ Authorization: Bearer {access_token}
 
 ## agoraId 규칙
 
-- 3-20자 길이
-- 영문 소문자, 숫자, 언더스코어(_) 만 사용
-- 예: `john_doe`, `user123`, `dev_team`
+- 3-50자 길이
+- 영문(대소문자), 숫자, 언더스코어(_) 만 사용
+- 예: `john_doe`, `John_Doe`, `user123`, `dev_team`
