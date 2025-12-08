@@ -940,6 +940,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
   Map<String, dynamic> _friendToMap(dynamic friend) {
     return {
       'id': friend.id,
+      'agoraId': friend.agoraId,
       'name': friend.displayName,
       'image': friend.profileImageUrl,
       'avatar': friend.displayName.isNotEmpty ? friend.displayName[0] : '?',

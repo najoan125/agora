@@ -1,12 +1,14 @@
 // 상대방 프로필 상세 화면
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../data/data_manager.dart';
 import '../../chat/screens/conversation_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../settings/screens/more_screen.dart';
+import '../../../shared/providers/chat_provider.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> user;
 
   const ProfileScreen({
@@ -15,10 +17,10 @@ class ProfileScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final DataManager _dataManager = DataManager();
   late bool _isCurrentUser;
   late bool _isFavorite;
@@ -184,17 +186,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _buildCircleButton(
           icon: Icons.chat_bubble_outline,
           label: '1:1 채팅',
-          onTap: () {
-             Navigator.push(
+          onTap: () async {
+            // agoraId로 채팅방 생성/조회
+            final agoraId = widget.user['agoraId']?.toString() ?? '';
+            if (agoraId.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('채팅을 시작할 수 없습니다.')),
+              );
+              return;
+            }
+
+            final notifier = ref.read(chatActionProvider.notifier);
+            final chat = await notifier.startDirectChat(agoraId);
+
+            if (chat != null && mounted) {
+              Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ConversationScreen(
-                    chatId: widget.user['chatId'] ?? '', // TODO: Get or create chat ID
-                    userName: widget.user['name'],
+                    chatId: chat.id.toString(),
+                    userName: widget.user['name'] ?? '',
                     userImage: widget.user['image'] ?? '',
                   ),
                 ),
               );
+            } else if (mounted) {
+              final error = ref.read(chatActionProvider).error;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error ?? '채팅방 생성에 실패했습니다.')),
+              );
+            }
           },
         ),
       ],
