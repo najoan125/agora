@@ -326,7 +326,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                   },
                                   onAccept: () async {
                                     final notifier = ref.read(friendActionProvider.notifier);
-                                    final success = await notifier.acceptFriendRequest(request.id);
+                                    final success = await notifier.acceptFriendRequest(request.id.toString());
                                     if (success && mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(content: Text('${request.senderDisplayName}님을 친구로 추가했습니다')),
@@ -335,7 +335,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                   },
                                   onDecline: () async {
                                     final notifier = ref.read(friendActionProvider.notifier);
-                                    final success = await notifier.rejectFriendRequest(request.id);
+                                    final success = await notifier.rejectFriendRequest(request.id.toString());
                                     if (success && mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(content: Text('${request.senderDisplayName}님의 친구 요청을 거절했습니다')),
