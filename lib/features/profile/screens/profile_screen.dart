@@ -262,7 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(height: 24),
           _buildInfoRow(Icons.email_outlined, widget.user['email'] ?? 'user@example.com'),
           const Divider(height: 24),
-          _buildInfoRow(Icons.badge_outlined, widget.user['id'] ?? '@seona_123'),
+          _buildInfoRow(Icons.badge_outlined, widget.user['id']?.toString() ?? '@seona_123'),
           if (!_isCurrentUser) ...[
              const Divider(height: 24),
              _buildInfoRow(Icons.cake_outlined, widget.user['birthdate'] ?? '1월 1일'),
