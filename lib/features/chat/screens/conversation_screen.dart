@@ -57,6 +57,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
   // WebSocket 연결 여부
   bool _isWebSocketInitialized = false;
+  WebSocketService? _webSocketService;
 
   @override
   void initState() {
@@ -107,13 +108,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   void _initializeWebSocket() {
     if (_isWebSocketInitialized) return;
 
-    final wsService = ref.read(webSocketServiceProvider);
+    _webSocketService = ref.read(webSocketServiceProvider);
 
     // WebSocket 연결 (이미 연결되어 있으면 무시됨)
-    wsService.connect();
+    _webSocketService!.connect();
 
     // 채팅방 구독
-    wsService.subscribeToChatRoom(widget.chatId);
+    _webSocketService!.subscribeToChatRoom(widget.chatId);
 
     _isWebSocketInitialized = true;
   }
@@ -126,9 +127,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void dispose() {
     // WebSocket 구독 해제
-    if (_isWebSocketInitialized) {
-      final wsService = ref.read(webSocketServiceProvider);
-      wsService.unsubscribeFromChatRoom(widget.chatId);
+    if (_isWebSocketInitialized && _webSocketService != null) {
+      _webSocketService!.unsubscribeFromChatRoom(widget.chatId);
     }
 
     _previewAudioPlayer.dispose();
@@ -294,7 +294,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       text: apiMessage.content,
       isMe: apiMessage.senderAgoraId == currentUserId,
       time: apiMessage.createdAt,
-      sender: apiMessage.senderDisplayName,
+      sender: apiMessage.displayName,
       // TODO: 첨부파일 처리
       // imageUrl: apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('image'))?.fileUrl,
       // fileName: apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image'))?.fileName,

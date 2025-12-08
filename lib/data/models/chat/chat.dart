@@ -17,15 +17,19 @@ class Chat {
   final dynamic id;
   final ChatType? type;
   final String? name;
+  @JsonKey(name: 'profileImage')
   final String? profileImageUrl;
   final int? participantCount;
-  @JsonKey(name: 'lastMessage')
+  @JsonKey(name: 'lastMessageContent')
   final dynamic lastMessageContent;
+  @JsonKey(name: 'lastMessageTime')
   final DateTime? lastMessageAt;
+  @JsonKey(defaultValue: 0)
   final int unreadCount;
+  @JsonKey(defaultValue: false)
   final bool isPinned;
   final String? folderId;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   const Chat({
     required this.id,
@@ -38,7 +42,7 @@ class Chat {
     this.unreadCount = 0,
     this.isPinned = false,
     this.folderId,
-    required this.createdAt,
+    this.createdAt,
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) => _$ChatFromJson(json);
@@ -50,9 +54,7 @@ class Chat {
     if (lastMessageContent is String) {
       return ChatMessage(
         id: '',
-        chatId: id.toString(),
         senderAgoraId: '',
-        senderDisplayName: '',
         content: lastMessageContent,
         type: MessageType.text,
         createdAt: lastMessageAt ?? DateTime.now(),
@@ -134,12 +136,16 @@ class ChatListResponse {
 /// 채팅 메시지 (간단한 버전 - Chat 모델에 포함)
 @JsonSerializable()
 class ChatMessage {
-  final String id;
-  final String chatId;
+  @JsonKey(name: 'messageId')
+  final dynamic id;
+  final String? chatId;
   final String senderAgoraId;
-  final String senderDisplayName;
+  final String? senderEmail;
+  final String? senderProfileImage;
+  final String? senderDisplayName;
   final String content;
   final MessageType type;
+  @JsonKey(defaultValue: false)
   final bool isDeleted;
   final String? replyToId;
   final List<MessageAttachment>? attachments;
@@ -147,9 +153,11 @@ class ChatMessage {
 
   const ChatMessage({
     required this.id,
-    required this.chatId,
+    this.chatId,
     required this.senderAgoraId,
-    required this.senderDisplayName,
+    this.senderEmail,
+    this.senderProfileImage,
+    this.senderDisplayName,
     required this.content,
     required this.type,
     this.isDeleted = false,
@@ -157,6 +165,9 @@ class ChatMessage {
     this.attachments,
     required this.createdAt,
   });
+
+  /// 표시할 발신자 이름 (senderDisplayName 없으면 senderAgoraId 사용)
+  String get displayName => senderDisplayName ?? senderAgoraId;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
       _$ChatMessageFromJson(json);
@@ -204,16 +215,16 @@ class MessageAttachment {
 /// 메시지 목록 응답 (커서 페이지네이션)
 @JsonSerializable()
 class MessageListResponse {
+  @JsonKey(name: 'messages')
   final List<ChatMessage> content;
-  final String? nextCursor;
+  final dynamic nextCursor;
+  @JsonKey(defaultValue: false)
   final bool hasNext;
-  final int size;
 
   const MessageListResponse({
     required this.content,
     this.nextCursor,
     required this.hasNext,
-    required this.size,
   });
 
   factory MessageListResponse.fromJson(Map<String, dynamic> json) =>

@@ -27,6 +27,7 @@ class ChatService {
           if (folderId != null) 'folderId': folderId,
         },
       );
+      print('>>> getChats response: ${response.data}');
       // 서버가 배열을 직접 반환
       final List<dynamic> data = response.data is List ? response.data : [];
       final chats = data.map((json) => Chat.fromJson(json)).toList();
@@ -35,6 +36,7 @@ class ChatService {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
+      print('>>> getChats parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -46,11 +48,13 @@ class ChatService {
         ApiEndpoints.chats,
         data: {'targetAgoraId': targetAgoraId},
       );
+      print('>>> getOrCreateDirectChat response: ${response.data}');
       return Success(Chat.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
+      print('>>> getOrCreateDirectChat parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -84,11 +88,26 @@ class ChatService {
           'direction': direction,
         },
       );
+      print('>>> getMessages response: ${response.data}');
+
+      // 서버가 배열을 직접 반환하는 경우 처리
+      if (response.data is List) {
+        final messages = (response.data as List)
+            .map((json) => ChatMessage.fromJson(json as Map<String, dynamic>))
+            .toList();
+        return Success(MessageListResponse(
+          content: messages,
+          hasNext: false,
+          nextCursor: null,
+        ));
+      }
+
       return Success(MessageListResponse.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
+      print('>>> getMessages parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }

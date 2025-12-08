@@ -534,7 +534,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                       context,
                       MaterialPageRoute(
                         builder: (context) => ConversationScreen(
-                          chatId: chat.id,
+                          chatId: chat.id.toString(),
                           userName: chat.name ?? '알 수 없음',
                           userImage: chat.profileImageUrl ?? '',
                           isTeam: false,

@@ -10,30 +10,32 @@ Chat _$ChatFromJson(Map<String, dynamic> json) => Chat(
       id: json['chatId'],
       type: $enumDecodeNullable(_$ChatTypeEnumMap, json['type']),
       name: json['name'] as String?,
-      profileImageUrl: json['profileImageUrl'] as String?,
+      profileImageUrl: json['profileImage'] as String?,
       participantCount: (json['participantCount'] as num?)?.toInt(),
-      lastMessageContent: json['lastMessage'],
-      lastMessageAt: json['lastMessageAt'] == null
+      lastMessageContent: json['lastMessageContent'],
+      lastMessageAt: json['lastMessageTime'] == null
           ? null
-          : DateTime.parse(json['lastMessageAt'] as String),
+          : DateTime.parse(json['lastMessageTime'] as String),
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
       isPinned: json['isPinned'] as bool? ?? false,
       folderId: json['folderId'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.parse(json['createdAt'] as String),
     );
 
 Map<String, dynamic> _$ChatToJson(Chat instance) => <String, dynamic>{
       'chatId': instance.id,
       'type': _$ChatTypeEnumMap[instance.type],
       'name': instance.name,
-      'profileImageUrl': instance.profileImageUrl,
+      'profileImage': instance.profileImageUrl,
       'participantCount': instance.participantCount,
-      'lastMessage': instance.lastMessageContent,
-      'lastMessageAt': instance.lastMessageAt?.toIso8601String(),
+      'lastMessageContent': instance.lastMessageContent,
+      'lastMessageTime': instance.lastMessageAt?.toIso8601String(),
       'unreadCount': instance.unreadCount,
       'isPinned': instance.isPinned,
       'folderId': instance.folderId,
-      'createdAt': instance.createdAt.toIso8601String(),
+      'createdAt': instance.createdAt?.toIso8601String(),
     };
 
 const _$ChatTypeEnumMap = {
@@ -89,10 +91,12 @@ Map<String, dynamic> _$ChatListResponseToJson(ChatListResponse instance) =>
     };
 
 ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
-      id: json['id'] as String,
-      chatId: json['chatId'] as String,
+      id: json['messageId'],
+      chatId: json['chatId'] as String?,
       senderAgoraId: json['senderAgoraId'] as String,
-      senderDisplayName: json['senderDisplayName'] as String,
+      senderEmail: json['senderEmail'] as String?,
+      senderProfileImage: json['senderProfileImage'] as String?,
+      senderDisplayName: json['senderDisplayName'] as String?,
       content: json['content'] as String,
       type: $enumDecode(_$MessageTypeEnumMap, json['type']),
       isDeleted: json['isDeleted'] as bool? ?? false,
@@ -105,9 +109,11 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
 
 Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
     <String, dynamic>{
-      'id': instance.id,
+      'messageId': instance.id,
       'chatId': instance.chatId,
       'senderAgoraId': instance.senderAgoraId,
+      'senderEmail': instance.senderEmail,
+      'senderProfileImage': instance.senderProfileImage,
       'senderDisplayName': instance.senderDisplayName,
       'content': instance.content,
       'type': _$MessageTypeEnumMap[instance.type]!,
@@ -148,19 +154,17 @@ Map<String, dynamic> _$MessageAttachmentToJson(MessageAttachment instance) =>
 
 MessageListResponse _$MessageListResponseFromJson(Map<String, dynamic> json) =>
     MessageListResponse(
-      content: (json['content'] as List<dynamic>)
+      content: (json['messages'] as List<dynamic>)
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
           .toList(),
-      nextCursor: json['nextCursor'] as String?,
-      hasNext: json['hasNext'] as bool,
-      size: (json['size'] as num).toInt(),
+      nextCursor: json['nextCursor'],
+      hasNext: json['hasNext'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$MessageListResponseToJson(
         MessageListResponse instance) =>
     <String, dynamic>{
-      'content': instance.content,
+      'messages': instance.content,
       'nextCursor': instance.nextCursor,
       'hasNext': instance.hasNext,
-      'size': instance.size,
     };
