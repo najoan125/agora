@@ -13,6 +13,7 @@ class AccountService {
   Future<Result<void>> changePassword({
     required String currentPassword,
     required String newPassword,
+    required String confirmPassword,
   }) async {
     try {
       await _apiClient.put(
@@ -20,6 +21,7 @@ class AccountService {
         data: {
           'currentPassword': currentPassword,
           'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
         },
       );
       return const Success(null);

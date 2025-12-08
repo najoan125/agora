@@ -99,10 +99,9 @@ class ChatFolderService {
   }
 
   /// 채팅을 폴더에서 제거
-  Future<Result<void>> removeChatFromFolder(
-      String chatId, String folderId) async {
+  Future<Result<void>> removeChatFromFolder(String chatId) async {
     try {
-      await _apiClient.delete(ApiEndpoints.chatToFolder(chatId, folderId));
+      await _apiClient.delete(ApiEndpoints.chatRemoveFromFolder(chatId));
       return const Success(null);
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??

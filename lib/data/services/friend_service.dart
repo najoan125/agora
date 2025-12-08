@@ -44,7 +44,7 @@ class FriendService {
     try {
       await _apiClient.post(
         ApiEndpoints.friendRequest,
-        data: {'targetAgoraId': targetAgoraId},
+        data: {'agoraId': targetAgoraId},
       );
       return const Success(null);
     } on DioException catch (e) {

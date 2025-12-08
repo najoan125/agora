@@ -123,12 +123,13 @@ class SettingsActionNotifier extends StateNotifier<SettingsActionState> {
 
   /// 비밀번호 변경
   Future<bool> changePassword(
-      String currentPassword, String newPassword) async {
+      String currentPassword, String newPassword, String confirmPassword) async {
     state = const SettingsActionState(isLoading: true);
 
     final result = await _accountService.changePassword(
       currentPassword: currentPassword,
       newPassword: newPassword,
+      confirmPassword: confirmPassword,
     );
 
     return result.when(
