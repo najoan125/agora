@@ -83,10 +83,10 @@ class DoNotDisturbSettings {
 enum ProfileVisibility {
   @JsonValue('PUBLIC')
   public,
-  @JsonValue('FRIENDS_ONLY')
-  friendsOnly,
-  @JsonValue('PRIVATE')
-  private,
+  @JsonValue('FRIENDS')
+  friends,
+  @JsonValue('NONE')
+  none,
 }
 
 /// 개인정보 설정
@@ -96,14 +96,18 @@ class PrivacySettings {
   final ProfileVisibility phoneVisibility;
   final ProfileVisibility birthdayVisibility;
   final bool allowFriendRequests;
+  final bool allowGroupInvites;
   final bool showOnlineStatus;
+  final int sessionTimeout;
 
   const PrivacySettings({
     this.profileVisibility = ProfileVisibility.public,
-    this.phoneVisibility = ProfileVisibility.friendsOnly,
-    this.birthdayVisibility = ProfileVisibility.friendsOnly,
+    this.phoneVisibility = ProfileVisibility.friends,
+    this.birthdayVisibility = ProfileVisibility.friends,
     this.allowFriendRequests = true,
+    this.allowGroupInvites = true,
     this.showOnlineStatus = true,
+    this.sessionTimeout = 30,
   });
 
   factory PrivacySettings.fromJson(Map<String, dynamic> json) =>
@@ -115,14 +119,18 @@ class PrivacySettings {
     ProfileVisibility? phoneVisibility,
     ProfileVisibility? birthdayVisibility,
     bool? allowFriendRequests,
+    bool? allowGroupInvites,
     bool? showOnlineStatus,
+    int? sessionTimeout,
   }) {
     return PrivacySettings(
       profileVisibility: profileVisibility ?? this.profileVisibility,
       phoneVisibility: phoneVisibility ?? this.phoneVisibility,
       birthdayVisibility: birthdayVisibility ?? this.birthdayVisibility,
       allowFriendRequests: allowFriendRequests ?? this.allowFriendRequests,
+      allowGroupInvites: allowGroupInvites ?? this.allowGroupInvites,
       showOnlineStatus: showOnlineStatus ?? this.showOnlineStatus,
+      sessionTimeout: sessionTimeout ?? this.sessionTimeout,
     );
   }
 }

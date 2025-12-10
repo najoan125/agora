@@ -10,16 +10,34 @@ enum ChatType {
   group,
 }
 
+/// 채팅 컨텍스트
+enum ChatContext {
+  @JsonValue('FRIEND')
+  friend,
+  @JsonValue('TEAM')
+  team,
+}
+
 /// 채팅방 모델
 @JsonSerializable()
 class Chat {
   @JsonKey(name: 'chatId')
   final dynamic id;
   final ChatType? type;
+  final ChatContext? context;
+  final String? displayName;
+  final String? displayImage;
   final String? name;
   @JsonKey(name: 'profileImage')
   final String? profileImageUrl;
+  final int? teamId;
+  final String? teamName;
   final int? participantCount;
+  final List<ParticipantProfile>? participants;
+  final ParticipantProfile? otherParticipant;
+  final int? readCount;
+  final bool? readEnabled;
+  final int? messageCount;
   @JsonKey(name: 'lastMessageContent')
   final dynamic lastMessageContent;
   @JsonKey(name: 'lastMessageTime')
@@ -30,19 +48,31 @@ class Chat {
   final bool isPinned;
   final String? folderId;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const Chat({
     required this.id,
     this.type,
+    this.context,
+    this.displayName,
+    this.displayImage,
     this.name,
     this.profileImageUrl,
+    this.teamId,
+    this.teamName,
     this.participantCount,
+    this.participants,
+    this.otherParticipant,
+    this.readCount,
+    this.readEnabled,
+    this.messageCount,
     this.lastMessageContent,
     this.lastMessageAt,
     this.unreadCount = 0,
     this.isPinned = false,
     this.folderId,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) => _$ChatFromJson(json);
@@ -66,14 +96,14 @@ class Chat {
     return null;
   }
 
-  /// 표시할 이름
+  /// 표시할 이름 (우선순위: displayName > name)
   String getDisplayName(String myAgoraId) {
-    return name ?? '채팅';
+    return displayName ?? name ?? '채팅';
   }
 
-  /// 표시할 프로필 이미지
+  /// 표시할 프로필 이미지 (우선순위: displayImage > profileImageUrl)
   String? getDisplayImage(String myAgoraId) {
-    return profileImageUrl;
+    return displayImage ?? profileImageUrl;
   }
 }
 
@@ -139,7 +169,11 @@ class ChatMessage {
   @JsonKey(name: 'messageId')
   final dynamic id;
   final String? chatId;
+  @JsonKey(name: 'senderId')
+  final int? senderId;
   final String senderAgoraId;
+  @JsonKey(name: 'senderName')
+  final String? senderName;
   final String? senderEmail;
   final String? senderProfileImage;
   final String? senderDisplayName;
@@ -147,6 +181,8 @@ class ChatMessage {
   final MessageType type;
   @JsonKey(defaultValue: false)
   final bool isDeleted;
+  @JsonKey(defaultValue: false)
+  final bool isPinned;
   final String? replyToId;
   final List<MessageAttachment>? attachments;
   final DateTime createdAt;
@@ -154,20 +190,23 @@ class ChatMessage {
   const ChatMessage({
     required this.id,
     this.chatId,
+    this.senderId,
     required this.senderAgoraId,
+    this.senderName,
     this.senderEmail,
     this.senderProfileImage,
     this.senderDisplayName,
     required this.content,
     required this.type,
     this.isDeleted = false,
+    this.isPinned = false,
     this.replyToId,
     this.attachments,
     required this.createdAt,
   });
 
-  /// 표시할 발신자 이름 (senderDisplayName 없으면 senderAgoraId 사용)
-  String get displayName => senderDisplayName ?? senderAgoraId;
+  /// 표시할 발신자 이름 (우선순위: senderName > senderDisplayName > senderAgoraId)
+  String get displayName => senderName ?? senderDisplayName ?? senderAgoraId;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
       _$ChatMessageFromJson(json);
@@ -210,6 +249,26 @@ class MessageAttachment {
   factory MessageAttachment.fromJson(Map<String, dynamic> json) =>
       _$MessageAttachmentFromJson(json);
   Map<String, dynamic> toJson() => _$MessageAttachmentToJson(this);
+}
+
+/// 참여자 프로필 (API 응답용)
+@JsonSerializable()
+class ParticipantProfile {
+  final int userId;
+  final String displayName;
+  final String? profileImage;
+  final String? identifier; // FRIEND: agoraId, TEAM: null
+
+  const ParticipantProfile({
+    required this.userId,
+    required this.displayName,
+    this.profileImage,
+    this.identifier,
+  });
+
+  factory ParticipantProfile.fromJson(Map<String, dynamic> json) =>
+      _$ParticipantProfileFromJson(json);
+  Map<String, dynamic> toJson() => _$ParticipantProfileToJson(this);
 }
 
 /// 메시지 목록 응답 (커서 페이지네이션)

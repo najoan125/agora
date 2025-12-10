@@ -3,7 +3,6 @@ import '../../data/services/friend_service.dart';
 import '../../data/models/friend/friend.dart';
 import '../../data/models/friend/friend_request.dart';
 import '../../data/models/friend/blocked_user.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Friend 서비스 Provider
 final friendServiceProvider = Provider<FriendService>((ref) {

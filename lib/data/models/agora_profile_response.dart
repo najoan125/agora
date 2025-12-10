@@ -1,4 +1,5 @@
 class AgoraProfileResponse {
+  final int? userId;
   final String agoraId;
   final String displayName;
   final String? profileImage;
@@ -9,6 +10,7 @@ class AgoraProfileResponse {
   final DateTime? updatedAt;
 
   AgoraProfileResponse({
+    this.userId,
     required this.agoraId,
     required this.displayName,
     this.profileImage,
@@ -21,6 +23,7 @@ class AgoraProfileResponse {
 
   factory AgoraProfileResponse.fromJson(Map<String, dynamic> json) {
     return AgoraProfileResponse(
+      userId: json['userId'] as int?,
       agoraId: json['agoraId'] as String,
       displayName: json['displayName'] as String,
       profileImage: json['profileImage'] as String?,
@@ -38,6 +41,7 @@ class AgoraProfileResponse {
 
   Map<String, dynamic> toJson() {
     return {
+      if (userId != null) 'userId': userId,
       'agoraId': agoraId,
       'displayName': displayName,
       'profileImage': profileImage,

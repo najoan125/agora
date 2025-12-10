@@ -166,4 +166,58 @@ class ChatService {
       return Failure(AppException.unknown(error: e));
     }
   }
+
+  // ============ Context 기반 1:1 채팅 API (신규) ============
+
+  /// Context 기반 1:1 채팅 생성/조회
+  ///
+  /// [targetUserId] 대상 사용자 ID
+  /// [context] 채팅 컨텍스트 ('FRIEND' 또는 'TEAM')
+  /// [teamId] 팀 ID (TEAM 컨텍스트 시 필수)
+  Future<Result<Chat>> createDirectChat({
+    required int targetUserId,
+    required String context,
+    int? teamId,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        ApiEndpoints.chatsDirect,
+        data: {
+          'targetUserId': targetUserId,
+          'context': context,
+          if (teamId != null) 'teamId': teamId,
+        },
+      );
+      print('>>> createDirectChat response: ${response.data}');
+      return Success(Chat.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      print('>>> createDirectChat parsing error: $e');
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// Context별 1:1 채팅 목록 조회
+  ///
+  /// [context] 채팅 컨텍스트 ('FRIEND' 또는 'TEAM')
+  Future<Result<List<Chat>>> getDirectChats(String context) async {
+    try {
+      final response = await _apiClient.get(
+        ApiEndpoints.chatsDirect,
+        queryParameters: {'context': context},
+      );
+      print('>>> getDirectChats response: ${response.data}');
+      final List<dynamic> data = response.data is List ? response.data : [];
+      final chats = data.map((json) => Chat.fromJson(json)).toList();
+      return Success(chats);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      print('>>> getDirectChats parsing error: $e');
+      return Failure(AppException.unknown(error: e));
+    }
+  }
 }

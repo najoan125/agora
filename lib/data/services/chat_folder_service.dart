@@ -88,7 +88,7 @@ class ChatFolderService {
   /// 채팅을 폴더에 추가
   Future<Result<void>> addChatToFolder(String chatId, String folderId) async {
     try {
-      await _apiClient.post(ApiEndpoints.chatToFolder(chatId, folderId));
+      await _apiClient.post(ApiEndpoints.chatToFolder(folderId, chatId));
       return const Success(null);
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
@@ -99,9 +99,9 @@ class ChatFolderService {
   }
 
   /// 채팅을 폴더에서 제거
-  Future<Result<void>> removeChatFromFolder(String chatId) async {
+  Future<Result<void>> removeChatFromFolder(String chatId, String folderId) async {
     try {
-      await _apiClient.delete(ApiEndpoints.chatRemoveFromFolder(chatId));
+      await _apiClient.delete(ApiEndpoints.chatRemoveFromFolder(folderId, chatId));
       return const Success(null);
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??

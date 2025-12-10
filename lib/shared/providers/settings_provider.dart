@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/settings_service.dart';
 import '../../data/services/account_service.dart';
 import '../../data/models/settings/settings.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Settings 서비스 Provider
 final settingsServiceProvider = Provider<SettingsService>((ref) {

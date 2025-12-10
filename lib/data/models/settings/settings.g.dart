@@ -63,12 +63,14 @@ PrivacySettings _$PrivacySettingsFromJson(Map<String, dynamic> json) =>
           ProfileVisibility.public,
       phoneVisibility: $enumDecodeNullable(
               _$ProfileVisibilityEnumMap, json['phoneVisibility']) ??
-          ProfileVisibility.friendsOnly,
+          ProfileVisibility.friends,
       birthdayVisibility: $enumDecodeNullable(
               _$ProfileVisibilityEnumMap, json['birthdayVisibility']) ??
-          ProfileVisibility.friendsOnly,
+          ProfileVisibility.friends,
       allowFriendRequests: json['allowFriendRequests'] as bool? ?? true,
+      allowGroupInvites: json['allowGroupInvites'] as bool? ?? true,
       showOnlineStatus: json['showOnlineStatus'] as bool? ?? true,
+      sessionTimeout: (json['sessionTimeout'] as num?)?.toInt() ?? 30,
     );
 
 Map<String, dynamic> _$PrivacySettingsToJson(PrivacySettings instance) =>
@@ -79,13 +81,15 @@ Map<String, dynamic> _$PrivacySettingsToJson(PrivacySettings instance) =>
       'birthdayVisibility':
           _$ProfileVisibilityEnumMap[instance.birthdayVisibility]!,
       'allowFriendRequests': instance.allowFriendRequests,
+      'allowGroupInvites': instance.allowGroupInvites,
       'showOnlineStatus': instance.showOnlineStatus,
+      'sessionTimeout': instance.sessionTimeout,
     };
 
 const _$ProfileVisibilityEnumMap = {
   ProfileVisibility.public: 'PUBLIC',
-  ProfileVisibility.friendsOnly: 'FRIENDS_ONLY',
-  ProfileVisibility.private: 'PRIVATE',
+  ProfileVisibility.friends: 'FRIENDS',
+  ProfileVisibility.none: 'NONE',
 };
 
 BirthdayReminderSettings _$BirthdayReminderSettingsFromJson(

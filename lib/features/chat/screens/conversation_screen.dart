@@ -15,7 +15,10 @@ import 'package:audioplayers/audioplayers.dart';
 import 'media_gallery_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/chat_provider.dart';
+import '../../../shared/providers/file_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 import '../../../services/websocket_service.dart';
+import '../../../data/api_client.dart';
 import '../../../data/models/chat/chat.dart';
 
 class ConversationScreen extends ConsumerStatefulWidget {
@@ -142,17 +145,15 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     if (text.trim().isEmpty && _selectedImages.isEmpty && _selectedFiles.isEmpty && _selectedVoiceMemo == null) return;
 
     try {
-      // TODO: 파일 업로드 구현 필요
-      // 현재는 텍스트 메시지만 WebSocket으로 전송
       List<String>? fileIds;
 
-      // 이미지나 파일이 있는 경우 파일 업로드 서비스 호출 필요
+      // 이미지나 파일이 있는 경우 파일 업로드 서비스 호출
       if (_selectedImages.isNotEmpty || _selectedFiles.isNotEmpty) {
-        // 파일 업로드 후 fileIds 획득
-        // fileIds = await _uploadFiles();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('파일 업로드 기능은 준비 중입니다.')),
-        );
+        fileIds = await _uploadFiles();
+        if (fileIds == null || fileIds.isEmpty) {
+          // 업로드 실패 시 중단
+          return;
+        }
       }
 
       // 메시지 타입 결정
@@ -161,9 +162,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
 
       if (_selectedVoiceMemo != null) {
         // 음성 메모의 경우 파일 업로드 후 FILE 타입으로 전송
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('음성 메모 업로드 기능은 준비 중입니다.')),
-        );
+        final voiceFile = File(_selectedVoiceMemo!);
+        final voiceFileIds = await _uploadFiles(voiceFiles: [voiceFile]);
+        if (voiceFileIds == null || voiceFileIds.isEmpty) {
+          return;
+        }
+        fileIds = voiceFileIds;
+        messageType = MessageType.file;
       } else if (_selectedImages.isNotEmpty) {
         messageType = MessageType.image;
       } else if (_selectedFiles.isNotEmpty) {
@@ -191,6 +196,62 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다: $e')),
       );
+    }
+  }
+
+  /// 파일 업로드 헬퍼 메서드
+  Future<List<String>?> _uploadFiles({List<File>? voiceFiles}) async {
+    try {
+      final fileService = ref.read(fileServiceProvider);
+      final uploadedFileIds = <String>[];
+
+      // 이미지 업로드
+      if (_selectedImages.isNotEmpty) {
+        for (final image in _selectedImages) {
+          final imageFile = File(image.path);
+          final result = await fileService.uploadImage(imageFile);
+
+          result.when(
+            success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+            failure: (error) => throw error,
+          );
+        }
+      }
+
+      // 일반 파일 업로드
+      if (_selectedFiles.isNotEmpty) {
+        for (final platformFile in _selectedFiles) {
+          if (platformFile.path != null) {
+            final file = File(platformFile.path!);
+            final result = await fileService.uploadFile(file);
+
+            result.when(
+              success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+              failure: (error) => throw error,
+            );
+          }
+        }
+      }
+
+      // 음성 파일 업로드
+      if (voiceFiles != null && voiceFiles.isNotEmpty) {
+        for (final voiceFile in voiceFiles) {
+          final result = await fileService.uploadFile(voiceFile);
+
+          result.when(
+            success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+            failure: (error) => throw error,
+          );
+        }
+      }
+
+      return uploadedFileIds;
+    } catch (e) {
+      print('❌ Error uploading files: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('파일 업로드 중 오류가 발생했습니다: $e')),
+      );
+      return null;
     }
   }
 
@@ -340,8 +401,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     // 메시지 목록 표시
     final messages = messageState.messages;
 
-    // TODO: currentUserId는 실제로는 프로필 Provider에서 가져와야 함
-    const currentUserId = 'me'; // 임시값
+    // 현재 사용자 ID (프로필 Provider에서 가져오기)
+    final myProfile = ref.watch(myProfileProvider);
+    final currentUserId = myProfile.when(
+      data: (profile) => profile?.agoraId ?? 'me',
+      loading: () => 'me',
+      error: (_, __) => 'me',
+    );
 
     return NotificationListener<ScrollNotification>(
       onNotification: (ScrollNotification scrollInfo) {

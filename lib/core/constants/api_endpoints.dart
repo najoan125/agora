@@ -55,6 +55,9 @@ class ApiEndpoints {
       '/api/agora/chats/$chatId/messages/$msgId';
   static String chatRead(String chatId) => '/api/agora/chats/$chatId/read';
 
+  // Context-based Chat API (신규)
+  static const String chatsDirect = '/api/agora/chats/direct';
+
   // ============ Group Chat ============
   static const String groupChats = '/api/agora/chats/groups';
   static String groupChatById(String id) => '/api/agora/chats/groups/$id';
@@ -64,17 +67,21 @@ class ApiEndpoints {
       '/api/agora/chats/groups/$id/members/$userId';
   static String groupChatLeave(String id) => '/api/agora/chats/groups/$id/leave';
 
+  // 신규 Group Chat API
+  static const String groupChat = '/api/agora/chats/group';
+
   // ============ Chat Folder ============
   static const String chatFolders = '/api/agora/chats/folders';
   static String chatFolderById(String id) => '/api/agora/chats/folders/$id';
-  static String chatToFolder(String chatId, String folderId) =>
-      '/api/agora/chats/$chatId/folder/$folderId';
-  static String chatRemoveFromFolder(String chatId) =>
-      '/api/agora/chats/$chatId/folder';
+  static String chatToFolder(String folderId, String chatId) =>
+      '/api/agora/chats/folders/$folderId/chats/$chatId';
+  static String chatRemoveFromFolder(String folderId, String chatId) =>
+      '/api/agora/chats/folders/$folderId/chats/$chatId';
 
   // ============ Files ============
   static const String fileUpload = '/api/agora/files/upload';
   static const String fileUploadImage = '/api/agora/files/upload-image';
+  static String fileMeta(String fileId) => '/api/agora/files/meta/$fileId';
   static String fileById(String fileId) => '/api/agora/files/$fileId';
   static String fileDownload(String fileId) =>
       '/api/agora/files/$fileId/download';

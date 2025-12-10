@@ -1,45 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:agora/core/theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/team_provider.dart';
+import '../../../data/models/team/team.dart';
 
-class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+class CalendarScreen extends ConsumerStatefulWidget {
+  final String teamId;
+
+  const CalendarScreen({super.key, required this.teamId});
 
   @override
-  State<CalendarScreen> createState() => _CalendarScreenState();
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  // Mock events
-  final Map<DateTime, List<Map<String, String>>> _events = {
-    DateTime.now(): [
-      {'title': '팀 주간 회의', 'time': '10:00 AM', 'type': 'meeting'},
-      {'title': '프로젝트 마감', 'time': '18:00 PM', 'type': 'deadline'},
-    ],
-    DateTime.now().add(const Duration(days: 1)): [
-      {'title': '점심 회식', 'time': '12:30 PM', 'type': 'event'},
-    ],
-    DateTime.now().add(const Duration(days: 2)): [
-      {'title': '코드 리뷰', 'time': '14:00 PM', 'type': 'work'},
-      {'title': '클라이언트 미팅', 'time': '16:00 PM', 'type': 'meeting'},
-    ],
-  };
+  List<Event> _getEventsForDay(List<Event> allEvents, DateTime day) {
+    return allEvents.where((event) {
+      final eventDate = event.startTime;
+      return eventDate.year == day.year &&
+          eventDate.month == day.month &&
+          eventDate.day == day.day;
+    }).toList();
+  }
 
-  List<Map<String, String>> _getEventsForDay(DateTime day) {
-    // Normalize date to ignore time for key matching
-
-    // Simple check for mock data - in real app, use proper date comparison
-    final key = _events.keys.firstWhere(
-      (k) => k.year == day.year && k.month == day.month && k.day == day.day,
-      orElse: () => DateTime(0),
-    );
-    return _events[key] ?? [];
+  bool _hasEventsForDay(List<Event> allEvents, DateTime day) {
+    return allEvents.any((event) {
+      final eventDate = event.startTime;
+      return eventDate.year == day.year &&
+          eventDate.month == day.month &&
+          eventDate.day == day.day;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final eventsAsync = ref.watch(teamEventsProvider(widget.teamId));
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -66,15 +65,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildCalendarHeader(),
-          _buildCalendarGrid(),
-          const SizedBox(height: 20),
-          Expanded(
-            child: _buildEventList(),
+      body: eventsAsync.when(
+        data: (events) => Column(
+          children: [
+            _buildCalendarHeader(),
+            _buildCalendarGrid(events),
+            const SizedBox(height: 20),
+            Expanded(
+              child: _buildEventList(events),
+            ),
+          ],
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                '일정을 불러올 수 없습니다',
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(teamEventsProvider(widget.teamId));
+                },
+                child: const Text('다시 시도'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -110,7 +132,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildCalendarGrid() {
+  Widget _buildCalendarGrid(List<Event> events) {
     final daysInMonth =
         DateUtils.getDaysInMonth(_focusedDay.year, _focusedDay.month);
     final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
@@ -145,7 +167,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               final isToday = DateUtils.isSameDay(date, DateTime.now());
               final isSelected = _selectedDay != null &&
                   DateUtils.isSameDay(date, _selectedDay);
-              final hasEvents = _getEventsForDay(date).isNotEmpty;
+              final hasEvents = _hasEventsForDay(events, date);
 
               return GestureDetector(
                 onTap: () {
@@ -201,15 +223,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildEventList() {
-    final events = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
-
+  Widget _buildEventList(List<Event> allEvents) {
     if (_selectedDay == null) {
-      return const Center(child: Text('날짜를 선택하여 일정을 확인하세요.'));
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.calendar_today, size: 60, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              '날짜를 선택하여 일정을 확인하세요',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
 
+    final events = _getEventsForDay(allEvents, _selectedDay!);
+
     if (events.isEmpty) {
-      return const Center(child: Text('일정이 없습니다.'));
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_busy, size: 60, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              '일정이 없습니다',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
@@ -217,20 +263,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
-        Color eventColor;
-        switch (event['type']) {
-          case 'meeting':
-            eventColor = Colors.blue;
-            break;
-          case 'deadline':
-            eventColor = Colors.red;
-            break;
-          case 'work':
-            eventColor = Colors.green;
-            break;
-          default:
-            eventColor = Colors.orange;
-        }
+        final eventColor = _getEventColor(event);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -263,7 +296,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      event['title']!,
+                      event.title,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -272,12 +305,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      event['time']!,
+                      _formatEventTime(event),
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppTheme.textSecondary,
                       ),
                     ),
+                    if (event.description != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        event.description!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (event.location != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            event.location!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -286,5 +347,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
         );
       },
     );
+  }
+
+  Color _getEventColor(Event event) {
+    // 이벤트 타입이나 우선순위에 따라 색상 결정
+    // 현재는 시간대에 따라 색상 구분
+    final hour = event.startTime.hour;
+    if (hour < 12) {
+      return Colors.blue;
+    } else if (hour < 18) {
+      return Colors.green;
+    } else {
+      return Colors.orange;
+    }
+  }
+
+  String _formatEventTime(Event event) {
+    if (event.isAllDay) {
+      return '종일';
+    }
+    final startTime = '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')}';
+    final endTime = '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}';
+    return '$startTime - $endTime';
   }
 }

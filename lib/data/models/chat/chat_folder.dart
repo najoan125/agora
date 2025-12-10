@@ -5,9 +5,12 @@ part 'chat_folder.g.dart';
 /// 채팅 폴더 모델
 @JsonSerializable()
 class ChatFolder {
+  @JsonKey(name: 'folderId')
   final String id;
   final String name;
   final String? color;
+  final int? orderIndex;
+  final List<int>? chatIds;
   final int chatCount;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -16,6 +19,8 @@ class ChatFolder {
     required this.id,
     required this.name,
     this.color,
+    this.orderIndex,
+    this.chatIds,
     this.chatCount = 0,
     required this.createdAt,
     this.updatedAt,
@@ -29,6 +34,8 @@ class ChatFolder {
     String? id,
     String? name,
     String? color,
+    int? orderIndex,
+    List<int>? chatIds,
     int? chatCount,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,6 +44,8 @@ class ChatFolder {
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
+      orderIndex: orderIndex ?? this.orderIndex,
+      chatIds: chatIds ?? this.chatIds,
       chatCount: chatCount ?? this.chatCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

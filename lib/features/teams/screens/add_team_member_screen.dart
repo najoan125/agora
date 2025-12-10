@@ -1,24 +1,27 @@
 // 팀원 초대 및 추가 화면
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
+import '../../../data/models/agora_profile_response.dart';
 
-class AddTeamMemberScreen extends StatefulWidget {
+class AddTeamMemberScreen extends ConsumerStatefulWidget {
   final Function(List<Map<String, dynamic>>) onMembersAdded;
 
   const AddTeamMemberScreen({Key? key, required this.onMembersAdded})
       : super(key: key);
 
   @override
-  State<AddTeamMemberScreen> createState() => _AddTeamMemberScreenState();
+  ConsumerState<AddTeamMemberScreen> createState() => _AddTeamMemberScreenState();
 }
 
-class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
+class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late TextEditingController _searchController;
   String _searchQuery = '';
   bool _isSearching = false;
-  List<Map<String, dynamic>> _searchResults = [];
-  final Set<Map<String, dynamic>> _selectedMembers = {};
+  List<AgoraProfileResponse> _searchResults = [];
+  final Set<AgoraProfileResponse> _selectedMembers = {};
   String _selectedCountryCode = '+82';
 
   final Map<String, String> _countryCodes = {
@@ -29,58 +32,6 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
     '영국': '+44',
     '호주': '+61',
   };
-
-  // 모의 팀원 데이터베이스
-  final List<Map<String, dynamic>> _availableMembers = [
-    {
-      'name': '김철수',
-      'phone': '010-1234-5678',
-      'id': 'kim_cs',
-      'image': 'https://picsum.photos/seed/kim_cs/200/200',
-    },
-    {
-      'name': '이영희',
-      'phone': '010-2345-6789',
-      'id': 'lee_yh',
-      'image': 'https://picsum.photos/seed/lee_yh/200/200',
-    },
-    {
-      'name': '박민준',
-      'phone': '010-3456-7890',
-      'id': 'park_mj',
-      'image': 'https://picsum.photos/seed/park_mj/200/200',
-    },
-    {
-      'name': '최수진',
-      'phone': '010-4567-8901',
-      'id': 'choi_sj',
-      'image': 'https://picsum.photos/seed/choi_sj/200/200',
-    },
-    {
-      'name': '정준호',
-      'phone': '010-5678-9012',
-      'id': 'jung_jh',
-      'image': 'https://picsum.photos/seed/jung_jh/200/200',
-    },
-    {
-      'name': '홍길동',
-      'phone': '010-6789-0123',
-      'id': 'hong_gd',
-      'image': 'https://picsum.photos/seed/hong_gd/200/200',
-    },
-    {
-      'name': '유미영',
-      'phone': '010-7890-1234',
-      'id': 'yu_my',
-      'image': 'https://picsum.photos/seed/yu_my/200/200',
-    },
-    {
-      'name': '장예은',
-      'phone': '010-8901-2345',
-      'id': 'jang_ye',
-      'image': 'https://picsum.photos/seed/jang_ye/200/200',
-    },
-  ];
 
   @override
   void initState() {
@@ -96,7 +47,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
     super.dispose();
   }
 
-  void _searchMember() {
+  void _searchMember() async {
     if (_searchQuery.isEmpty) {
       setState(() {
         _searchResults = [];
@@ -109,30 +60,35 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
       _searchResults = [];
     });
 
-    // 검색 시뮬레이션 (0.5초 딜레이)
-    Future.delayed(const Duration(milliseconds: 500), () {
-      final results = _availableMembers
-          .where((member) =>
-              (member['phone'] as String).contains(_searchQuery) ||
-              (member['id'] as String)
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()) ||
-              (member['name'] as String)
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()))
-          .toList();
+    try {
+      // ProfileService를 통해 사용자 검색
+      final profileService = ref.read(profileServiceProvider);
+      final results = await profileService.searchUsers(keyword: _searchQuery);
 
-      setState(() {
-        _isSearching = false;
-        _searchResults = results;
-      });
-    });
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _searchResults = results;
+        });
+      }
+    } catch (e) {
+      print('❌ Error searching users: $e');
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _searchResults = [];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('사용자 검색 중 오류가 발생했습니다: $e')),
+        );
+      }
+    }
   }
 
-  void _toggleMemberSelection(Map<String, dynamic> member) {
+  void _toggleMemberSelection(AgoraProfileResponse member) {
     setState(() {
-      if (_selectedMembers.contains(member)) {
-        _selectedMembers.remove(member);
+      if (_selectedMembers.any((m) => m.userId == member.userId)) {
+        _selectedMembers.removeWhere((m) => m.userId == member.userId);
       } else {
         _selectedMembers.add(member);
       }
@@ -142,7 +98,17 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
   void _addSelectedMembers() {
     if (_selectedMembers.isEmpty) return;
 
-    widget.onMembersAdded(_selectedMembers.toList());
+    // AgoraProfileResponse를 Map으로 변환
+    final membersData = _selectedMembers.map((profile) {
+      return {
+        'name': profile.displayName,
+        'phone': profile.phone ?? '',
+        'id': profile.agoraId,
+        'image': profile.profileImage ?? '',
+      };
+    }).toList();
+
+    widget.onMembersAdded(membersData);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${_selectedMembers.length}명을 팀원으로 추가했습니다'),
@@ -471,108 +437,33 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
 
   Widget _buildSearchResultsList() {
     if (_searchQuery.isEmpty) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '추천 팀원',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 60,
+              color: Colors.grey.shade300,
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _availableMembers.take(4).length,
-              itemBuilder: (context, index) {
-                final member = _availableMembers[index];
-                final isSelected = _selectedMembers.contains(member);
-                
-                return GestureDetector(
-                  onTap: () => _toggleMemberSelection(member),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue.withOpacity(0.05) : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? Colors.blue : Colors.grey.shade200,
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(20),
-                            image: DecorationImage(
-                              image: NetworkImage(member['image'] as String),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                member['name'] as String,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                member['phone'] as String,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected ? Colors.blue : Colors.white,
-                            border: Border.all(
-                              color: isSelected ? Colors.blue : Colors.grey.shade400,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: isSelected
-                              ? const Icon(Icons.check,
-                                  size: 16, color: Colors.white)
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+            const SizedBox(height: 16),
+            Text(
+              '사용자를 검색하세요',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              '아이디, 이름, 전화번호로 검색할 수 있습니다',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade400,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -630,7 +521,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final member = _searchResults[index];
-        final isSelected = _selectedMembers.contains(member);
+        final isSelected = _selectedMembers.any((m) => m.userId == member.userId);
 
         return GestureDetector(
           onTap: () => _toggleMemberSelection(member),
@@ -653,11 +544,16 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(20),
-                    image: DecorationImage(
-                      image: NetworkImage(member['image'] as String),
-                      fit: BoxFit.cover,
-                    ),
+                    image: member.profileImage != null
+                        ? DecorationImage(
+                            image: NetworkImage(member.profileImage!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
+                  child: member.profileImage == null
+                      ? const Icon(Icons.person, size: 32, color: Colors.grey)
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -665,7 +561,7 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        member['name'] as String,
+                        member.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -673,12 +569,22 @@ class _AddTeamMemberScreenState extends State<AddTeamMemberScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        member['phone'] as String,
+                        '@${member.agoraId}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
                         ),
                       ),
+                      if (member.phone != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          member.phone!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

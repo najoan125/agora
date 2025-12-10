@@ -98,7 +98,7 @@ class FileService {
   /// 파일 메타데이터 조회
   Future<Result<AgoraFile>> getFileMetadata(String fileId) async {
     try {
-      final response = await _apiClient.get(ApiEndpoints.fileById(fileId));
+      final response = await _apiClient.get(ApiEndpoints.fileMeta(fileId));
       return Success(AgoraFile.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??

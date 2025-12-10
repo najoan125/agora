@@ -136,4 +136,54 @@ class GroupChatService {
       return Failure(AppException.unknown(error: e));
     }
   }
+
+  // ============ 신규 Group Chat API ============
+
+  /// 친구 그룹 채팅 생성 (신규 API)
+  ///
+  /// [name] 채팅방 이름
+  /// [profileImage] 채팅방 이미지 URL (선택)
+  /// [memberAgoraIds] 초대할 멤버 아고라 ID 목록 (memberUserIds와 둘 중 하나 필수)
+  /// [memberUserIds] 초대할 멤버 사용자 ID 목록 (memberAgoraIds와 둘 중 하나 필수)
+  Future<Result<Chat>> createGroupChatNew({
+    required String name,
+    String? profileImage,
+    List<String>? memberAgoraIds,
+    List<int>? memberUserIds,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        ApiEndpoints.groupChat,
+        data: {
+          'name': name,
+          if (profileImage != null) 'profileImage': profileImage,
+          if (memberAgoraIds != null) 'memberAgoraIds': memberAgoraIds,
+          if (memberUserIds != null) 'memberUserIds': memberUserIds,
+        },
+      );
+      return Success(Chat.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 그룹 채팅 목록 조회 (신규 API)
+  ///
+  /// 친구 그룹 채팅 목록만 조회 (팀 그룹 채팅 제외)
+  Future<Result<List<Chat>>> getGroupChats() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.groupChat);
+      final List<dynamic> data = response.data is List ? response.data : [];
+      final chats = data.map((json) => Chat.fromJson(json)).toList();
+      return Success(chats);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
 }

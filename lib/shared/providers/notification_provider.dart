@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/models/notification/notification.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Notification 서비스 Provider
 final notificationServiceProvider = Provider<NotificationService>((ref) {

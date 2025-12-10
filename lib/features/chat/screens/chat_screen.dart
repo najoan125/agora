@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../shared/providers/chat_provider.dart';
+import '../../../shared/providers/chat_folder_provider.dart';
 import '../../../data/models/chat/chat.dart';
 import '../widgets/chat_tile.dart';
 import 'conversation_screen.dart';
@@ -25,10 +26,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
   bool _isSearching = false;
   bool _showUnreadOnly = false;
 
-  // Custom Chat Folders (will be moved to API later)
-  final List<Map<String, dynamic>> _friendChatFolders = [];
-  final List<Map<String, dynamic>> _teamChatFolders = [];
-  Map<String, dynamic>? _selectedFolder;
+  // Selected folder
+  String? _selectedFolderId;
 
   @override
   void initState() {
@@ -37,7 +36,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
-          _selectedFolder = null;
+          _selectedFolderId = null;
           _showUnreadOnly = false;
         });
       }
@@ -80,7 +79,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
   @override
   Widget build(BuildContext context) {
     final bool isTeamTab = _tabController.index == 1;
-    final currentFolders = isTeamTab ? _teamChatFolders : _friendChatFolders;
+    final foldersAsync = ref.watch(chatFolderListProvider);
     final chatsAsync = ref.watch(chatListProvider);
 
     // Calculate total unread count
@@ -206,96 +205,108 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                   ),
 
                 // Filter Row (All / Unread / Custom Folders)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip(
-                          label: '전체',
-                          isSelected: !_showUnreadOnly && _selectedFolder == null,
-                          onTap: () {
-                            setState(() {
-                              _showUnreadOnly = false;
-                              _selectedFolder = null;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          label: '안읽음',
-                          isSelected: _showUnreadOnly,
-                          count: totalUnreadCount,
-                          onTap: () {
-                            setState(() {
-                              _showUnreadOnly = true;
-                              _selectedFolder = null;
-                            });
-                          },
-                          isUnreadFilter: true,
-                        ),
-                        const SizedBox(width: 8),
-
-                        // Custom Folder Chips
-                        ...currentFolders.map((folder) {
-                          final folderName = folder['name'] as String;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildFilterChip(
-                              label: folderName,
-                              isSelected: _selectedFolder == folder,
+                foldersAsync.when(
+                  loading: () => const SizedBox(
+                    height: 60,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (folders) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildFilterChip(
+                              label: '전체',
+                              isSelected: !_showUnreadOnly && _selectedFolderId == null,
                               onTap: () {
                                 setState(() {
-                                  if (_selectedFolder == folder) {
-                                    _selectedFolder = null;
-                                  } else {
-                                    _selectedFolder = folder;
-                                    _showUnreadOnly = false;
-                                  }
+                                  _showUnreadOnly = false;
+                                  _selectedFolderId = null;
                                 });
                               },
-                              onDelete: () {
+                            ),
+                            const SizedBox(width: 8),
+                            _buildFilterChip(
+                              label: '안읽음',
+                              isSelected: _showUnreadOnly,
+                              count: totalUnreadCount,
+                              onTap: () {
                                 setState(() {
-                                  currentFolders.remove(folder);
-                                  if (_selectedFolder == folder) {
-                                    _selectedFolder = null;
-                                  }
+                                  _showUnreadOnly = true;
+                                  _selectedFolderId = null;
                                 });
                               },
+                              isUnreadFilter: true,
                             ),
-                          );
-                        }).toList(),
+                            const SizedBox(width: 8),
 
-                        // Add button
-                        GestureDetector(
-                          onTap: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CreateChatFolderScreen(isTeam: isTeamTab),
+                            // Custom Folder Chips
+                            ...folders.map((folder) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: _buildFilterChip(
+                                  label: folder.name,
+                                  isSelected: _selectedFolderId == folder.id.toString(),
+                                  onTap: () {
+                                    setState(() {
+                                      if (_selectedFolderId == folder.id.toString()) {
+                                        _selectedFolderId = null;
+                                      } else {
+                                        _selectedFolderId = folder.id.toString();
+                                        _showUnreadOnly = false;
+                                      }
+                                    });
+                                  },
+                                  onDelete: () async {
+                                    final notifier = ref.read(chatFolderActionProvider.notifier);
+                                    final success = await notifier.deleteFolder(folder.id.toString());
+                                    if (success && mounted) {
+                                      if (_selectedFolderId == folder.id.toString()) {
+                                        setState(() {
+                                          _selectedFolderId = null;
+                                        });
+                                      }
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('폴더 "${folder.name}"이(가) 삭제되었습니다')),
+                                      );
+                                    }
+                                  },
+                                ),
+                              );
+                            }).toList(),
+
+                            // Add button
+                            GestureDetector(
+                              onTap: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CreateChatFolderScreen(isTeam: isTeamTab),
+                                  ),
+                                );
+
+                                if (result != null && result == true) {
+                                  ref.invalidate(chatFolderListProvider);
+                                }
+                              },
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: const Icon(Icons.add, size: 20, color: Colors.grey),
                               ),
-                            );
-
-                            if (result != null && result is Map<String, dynamic>) {
-                              setState(() {
-                                currentFolders.add(result);
-                              });
-                            }
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey[300]!),
                             ),
-                            child: const Icon(Icons.add, size: 20, color: Colors.grey),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
 
                 Expanded(
@@ -496,9 +507,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
         }
 
         // Filter by selected folder
-        if (_selectedFolder != null) {
-          final members = List<String>.from(_selectedFolder!['members'] ?? []);
-          filteredChats = filteredChats.where((chat) => members.contains(chat.name ?? '')).toList();
+        if (_selectedFolderId != null) {
+          final foldersAsync = ref.watch(chatFolderListProvider);
+          foldersAsync.whenData((folders) {
+            final selectedFolder = folders.firstWhere(
+              (f) => f.id.toString() == _selectedFolderId,
+              orElse: () => folders.first,
+            );
+            final chatIds = selectedFolder.chatIds?.map((id) => id.toString()).toList() ?? [];
+            filteredChats = filteredChats.where((chat) => chatIds.contains(chat.id.toString())).toList();
+          });
         }
 
         if (filteredChats.isEmpty) {
@@ -585,7 +603,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
   Widget _buildEmptyState() {
     String message = '대화가 없습니다';
     if (_showUnreadOnly) message = '안읽은 메시지가 없습니다';
-    if (_selectedFolder != null) message = '${_selectedFolder!['name']} 폴더에 대화가 없습니다';
+
+    // Get folder name if selected
+    if (_selectedFolderId != null) {
+      final foldersAsync = ref.watch(chatFolderListProvider);
+      foldersAsync.whenData((folders) {
+        final folder = folders.firstWhere(
+          (f) => f.id.toString() == _selectedFolderId,
+          orElse: () => folders.first,
+        );
+        message = '${folder.name} 폴더에 대화가 없습니다';
+      });
+    }
 
     return Center(
       child: Column(
@@ -597,7 +626,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
             message,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
-          if (!_showUnreadOnly && _selectedFolder == null)
+          if (!_showUnreadOnly && _selectedFolderId == null)
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
               child: Text(

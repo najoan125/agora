@@ -79,6 +79,24 @@ final teamEventsProvider =
   );
 });
 
+/// 내 팀 프로필 Provider
+final myTeamProfileProvider =
+    FutureProvider.autoDispose.family<TeamProfile?, int>((ref, teamId) async {
+  final service = ref.watch(teamServiceProvider);
+  final result = await service.getMyTeamProfile(teamId.toString());
+
+  return result.when(
+    success: (profile) => profile,
+    failure: (error) {
+      // 팀 프로필이 없는 경우 null 반환
+      if (error is AppException && error.statusCode == 404) {
+        return null;
+      }
+      throw error;
+    },
+  );
+});
+
 /// 팀 작업 상태
 class TeamActionState {
   final bool isLoading;

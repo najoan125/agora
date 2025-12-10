@@ -5,7 +5,6 @@ import '../../data/api_client.dart';
 import '../../data/models/agora_profile_response.dart';
 import '../../data/models/create_agora_profile_request.dart';
 import '../../data/models/update_agora_profile_request.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Profile 서비스 Provider
 final profileServiceProvider = Provider<ProfileService>((ref) {

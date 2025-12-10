@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/chat_service.dart';
 import '../../data/models/chat/chat.dart';
 import '../../services/websocket_service.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Chat 서비스 Provider
 final chatServiceProvider = Provider<ChatService>((ref) {

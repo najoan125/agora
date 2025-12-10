@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:agora/core/theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/team_provider.dart';
+import '../../../data/models/team/team.dart';
 
-class TodoScreen extends StatefulWidget {
-  const TodoScreen({super.key});
+class TodoScreen extends ConsumerStatefulWidget {
+  final String teamId;
+
+  const TodoScreen({super.key, required this.teamId});
 
   @override
-  State<TodoScreen> createState() => _TodoScreenState();
+  ConsumerState<TodoScreen> createState() => _TodoScreenState();
 }
 
-class _TodoScreenState extends State<TodoScreen> {
-  // Mock todos
-  final List<Map<String, dynamic>> _todos = [
-    {'title': '주간 보고서 작성', 'isDone': false, 'tag': '업무'},
-    {'title': '디자인 시안 검토', 'isDone': true, 'tag': '디자인'},
-    {'title': '팀 회식 장소 예약', 'isDone': false, 'tag': '기타'},
-    {'title': 'Flutter 3.0 마이그레이션', 'isDone': false, 'tag': '개발'},
-    {'title': '서버 API 연동 테스트', 'isDone': true, 'tag': '개발'},
-  ];
+class _TodoScreenState extends ConsumerState<TodoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final todosAsync = ref.watch(teamTodosProvider(widget.teamId));
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -45,24 +44,84 @@ class _TodoScreenState extends State<TodoScreen> {
           ),
         ],
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: _todos.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final todo = _todos[index];
-          return _buildTodoItem(todo, index);
+      body: todosAsync.when(
+        data: (todos) {
+          if (todos.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.checklist,
+                    size: 60,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '할일이 없습니다',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(20),
+            itemCount: todos.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final todo = todos[index];
+              return _buildTodoItem(todo);
+            },
+          );
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                '할일 목록을 불러올 수 없습니다',
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(teamTodosProvider(widget.teamId));
+                },
+                child: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildTodoItem(Map<String, dynamic> todo, int index) {
+  Widget _buildTodoItem(Todo todo) {
+    final isDone = todo.status == TodoStatus.done;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          todo['isDone'] = !todo['isDone'];
-        });
+      onTap: () async {
+        if (!isDone) {
+          // 할일 완료 처리
+          final success = await ref.read(teamActionProvider.notifier).completeTodo(
+                widget.teamId,
+                todo.id.toString(),
+              );
+
+          if (!success && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('할일 완료 처리 중 오류가 발생했습니다')),
+            );
+          }
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -70,10 +129,10 @@ class _TodoScreenState extends State<TodoScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: todo['isDone'] ? Colors.transparent : const Color(0xFFE0E0E0),
+            color: isDone ? Colors.transparent : const Color(0xFFE0E0E0),
           ),
           boxShadow: [
-            if (!todo['isDone'])
+            if (!isDone)
               BoxShadow(
                 color: Colors.black.withOpacity(0.03),
                 blurRadius: 8,
@@ -87,14 +146,14 @@ class _TodoScreenState extends State<TodoScreen> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: todo['isDone'] ? AppTheme.primaryColor : Colors.transparent,
+                color: isDone ? AppTheme.primaryColor : Colors.transparent,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: todo['isDone'] ? AppTheme.primaryColor : const Color(0xFFCCCCCC),
+                  color: isDone ? AppTheme.primaryColor : const Color(0xFFCCCCCC),
                   width: 2,
                 ),
               ),
-              child: todo['isDone']
+              child: isDone
                   ? const Icon(Icons.check, size: 16, color: Colors.white)
                   : null,
             ),
@@ -104,14 +163,26 @@ class _TodoScreenState extends State<TodoScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    todo['title'],
+                    todo.title,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      color: todo['isDone'] ? AppTheme.textSecondary : AppTheme.textPrimary,
-                      decoration: todo['isDone'] ? TextDecoration.lineThrough : null,
+                      color: isDone ? AppTheme.textSecondary : AppTheme.textPrimary,
+                      decoration: isDone ? TextDecoration.lineThrough : null,
                     ),
                   ),
+                  if (todo.description != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      todo.description!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -120,7 +191,7 @@ class _TodoScreenState extends State<TodoScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      todo['tag'],
+                      _getPriorityText(todo.priority),
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppTheme.textSecondary,
@@ -134,5 +205,16 @@ class _TodoScreenState extends State<TodoScreen> {
         ),
       ),
     );
+  }
+
+  String _getPriorityText(TodoPriority priority) {
+    switch (priority) {
+      case TodoPriority.high:
+        return '높음';
+      case TodoPriority.medium:
+        return '보통';
+      case TodoPriority.low:
+        return '낮음';
+    }
   }
 }
