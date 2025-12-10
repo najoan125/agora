@@ -18,6 +18,31 @@ final teamListProvider = FutureProvider.autoDispose<List<Team>>((ref) async {
   );
 });
 
+/// 팀 채팅 ID 목록 Provider (그룹 채팅에서 팀 채팅 필터링용)
+final teamChatIdsProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
+  final service = ref.watch(teamServiceProvider);
+  final teamsResult = await service.getTeams();
+
+  final teams = teamsResult.when(
+    success: (teams) => teams,
+    failure: (error) => <Team>[],
+  );
+
+  final Set<int> chatIds = {};
+  for (final team in teams) {
+    final chatResult = await service.getTeamChat(team.id.toString());
+    chatResult.when(
+      success: (chat) {
+        if (chat.id != null) {
+          chatIds.add(int.tryParse(chat.id.toString()) ?? -1);
+        }
+      },
+      failure: (_) {},
+    );
+  }
+  return chatIds;
+});
+
 /// 특정 팀 Provider
 final teamByIdProvider =
     FutureProvider.autoDispose.family<Team, String>((ref, teamId) async {

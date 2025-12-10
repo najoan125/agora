@@ -27,8 +27,6 @@ class ChatService {
           if (folderId != null) 'folderId': folderId,
         },
       );
-      print('>>> getChats response: ${response.data}');
-      // 서버가 배열을 직접 반환
       final List<dynamic> data = response.data is List ? response.data : [];
       final chats = data.map((json) => Chat.fromJson(json)).toList();
       return Success(chats);
@@ -36,7 +34,6 @@ class ChatService {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
-      print('>>> getChats parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -48,13 +45,11 @@ class ChatService {
         ApiEndpoints.chats,
         data: {'targetAgoraId': targetAgoraId},
       );
-      print('>>> getOrCreateDirectChat response: ${response.data}');
       return Success(Chat.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
-      print('>>> getOrCreateDirectChat parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -104,7 +99,6 @@ class ChatService {
           'direction': direction,
         },
       );
-      print('>>> getMessages response: ${response.data}');
 
       // 서버가 배열을 직접 반환하는 경우 처리
       if (response.data is List) {
@@ -123,7 +117,6 @@ class ChatService {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
-      print('>>> getMessages parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -204,13 +197,11 @@ class ChatService {
           if (teamId != null) 'teamId': teamId,
         },
       );
-      print('>>> createDirectChat response: ${response.data}');
       return Success(Chat.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
-      print('>>> createDirectChat parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
@@ -224,7 +215,6 @@ class ChatService {
         ApiEndpoints.chatsDirect,
         queryParameters: {'context': context},
       );
-      print('>>> getDirectChats response: ${response.data}');
       final List<dynamic> data = response.data is List ? response.data : [];
       final chats = data.map((json) => Chat.fromJson(json)).toList();
       return Success(chats);
@@ -232,12 +222,28 @@ class ChatService {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
     } catch (e) {
-      print('>>> getDirectChats parsing error: $e');
       return Failure(AppException.unknown(error: e));
     }
   }
 
   // ============ 그룹 채팅 관리 API (Group Chat) ============
+
+  /// 친구 그룹 채팅 목록 조회 (팀 그룹 채팅 제외)
+  ///
+  /// GET /api/agora/chats/group
+  Future<Result<List<Chat>>> getFriendGroupChats() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.groupChat);
+      final List<dynamic> data = response.data is List ? response.data : [];
+      final chats = data.map((json) => Chat.fromJson(json)).toList();
+      return Success(chats);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
 
   /// 그룹 채팅방 생성
   ///
@@ -258,7 +264,6 @@ class ChatService {
           if (fileId != null) 'fileId': fileId,
         },
       );
-      print('>>> createGroupChat response: ${response.data}');
       return Success(Chat.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??

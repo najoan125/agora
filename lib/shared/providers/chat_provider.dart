@@ -197,6 +197,18 @@ final chatListProvider =
   return ChatListNotifier(chatService, webSocketService, ref);
 });
 
+/// 친구 그룹 채팅 목록 Provider (팀 그룹 채팅 제외)
+final friendGroupChatsProvider =
+    FutureProvider.autoDispose<List<Chat>>((ref) async {
+  final service = ref.watch(chatServiceProvider);
+  final result = await service.getFriendGroupChats();
+
+  return result.when(
+    success: (chats) => chats,
+    failure: (error) => throw error,
+  );
+});
+
 
 
 /// 특정 채팅방 Provider

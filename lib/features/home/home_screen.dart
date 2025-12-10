@@ -16,14 +16,11 @@ import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
 import '../teams/screens/create_team_profile_screen.dart';
 import '../teams/widgets/team_invitation_tile.dart';
-import '../../data/models/chat/chat.dart';
-import '../chat/widgets/chat_tile.dart';
 import '../../shared/providers/chat_provider.dart';
 import '../teams/screens/edit_team_profile_screen.dart';
 
 import 'screens/notification_screen.dart';
 import '../chat/screens/create_group_screen.dart';
-import '../chat/screens/group_chat_screen.dart';
 import '../chat/screens/conversation_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -42,9 +39,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _searchQuery = '';
   bool _isMenuOpen = false;
   bool _isGroupChatExpanded = true;
-
-  // Group Chats list (will be loaded from API)
-  final List<Map<String, dynamic>> _groupChats = [];
 
   @override
   void initState() {
@@ -546,7 +540,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildGroupChatsSection() {
-    final chatListAsync = ref.watch(chatListProvider);
+    final friendGroupChatsAsync = ref.watch(friendGroupChatsProvider);
 
     return Column(
       children: [
@@ -570,19 +564,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                chatListAsync.when(
-                  data: (chats) {
-                    final groupCount =
-                        chats.where((c) => c.type == ChatType.group).length;
-                    return Text(
-                      '$groupCount',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    );
-                  },
+                friendGroupChatsAsync.when(
+                  data: (chats) => Text(
+                    '${chats.length}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
                   loading: () => const SizedBox(
                     width: 16,
                     height: 16,
@@ -631,7 +621,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         );
 
                         if (result != null) {
-                          // 그룹 생성 성공 시 목록 새로고침 (이미 CreateGroupScreen 내부에서 수행되지만 안전장치)
+                          ref.invalidate(friendGroupChatsProvider);
                           ref.invalidate(chatListProvider);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -670,36 +660,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
                   ),
-                  // Existing Group Chats
-                  ...chatListAsync.when(
-                    data: (chats) {
-                      final groupChats =
-                          chats.where((c) => c.type == ChatType.group).toList();
-                      return groupChats.map((chat) => Padding(
-                            padding: const EdgeInsets.only(right: 20.0),
-                            child: GroupChatTile(
-                              name: chat.displayName ?? chat.name ?? '그룹',
-                              image: chat.profileImageUrl ?? chat.displayImage,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ConversationScreen(
-                                      chatId: chat.id.toString(),
-                                      userName: chat.displayName ??
-                                          chat.name ??
-                                          '그룹',
-                                      userImage: chat.profileImageUrl ??
-                                          chat.displayImage ??
-                                          '',
-                                      isTeam: chat.type == ChatType.group,
-                                    ),
+                  // Existing Friend Group Chats
+                  ...friendGroupChatsAsync.when(
+                    data: (chats) => chats.map((chat) => Padding(
+                          padding: const EdgeInsets.only(right: 20.0),
+                          child: GroupChatTile(
+                            name: chat.displayName ?? chat.name ?? '그룹',
+                            image: chat.profileImageUrl ?? chat.displayImage,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ConversationScreen(
+                                    chatId: chat.id.toString(),
+                                    userName: chat.displayName ??
+                                        chat.name ??
+                                        '그룹',
+                                    userImage: chat.profileImageUrl ??
+                                        chat.displayImage ??
+                                        '',
+                                    isTeam: false,
                                   ),
-                                );
-                              },
-                            ),
-                          ));
-                    },
+                                ),
+                              );
+                            },
+                          ),
+                        )),
                     loading: () => [const SizedBox.shrink()],
                     error: (_, __) => [const SizedBox.shrink()],
                   ),
