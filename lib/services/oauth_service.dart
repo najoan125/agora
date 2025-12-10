@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import '../core/utils/pkce_util.dart';
 import '../core/utils/secure_storage_manager.dart';
 import '../core/constants/api_endpoints.dart';
@@ -11,7 +11,8 @@ import '../data/api_client.dart';
 /// OAuth 2.0 + PKCE 인증 서비스
 class OAuthService {
   final ApiClient _apiClient = ApiClient();
-  StreamSubscription? _linkSubscription;
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
 
   // OAuth 콜백 컴플리터
   Completer<OAuthResult>? _authCompleter;
@@ -20,7 +21,7 @@ class OAuthService {
   Future<void> initializeDeepLinkListener() async {
     // 앱이 종료된 상태에서 딥링크로 실행된 경우
     try {
-      final initialUri = await getInitialUri();
+      final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
         _handleDeepLink(initialUri);
       }
@@ -29,11 +30,9 @@ class OAuthService {
     }
 
     // 앱이 실행 중일 때 딥링크 수신
-    _linkSubscription = uriLinkStream.listen(
-      (Uri? uri) {
-        if (uri != null) {
-          _handleDeepLink(uri);
-        }
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (Uri uri) {
+        _handleDeepLink(uri);
       },
       onError: (err) {
         print('Deep link error: $err');

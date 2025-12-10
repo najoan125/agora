@@ -52,7 +52,7 @@ dependencies:
     sdk: flutter
 
   # OAuth 및 보안
-  uni_links: ^0.0.2
+  app_links: ^6.3.3
   url_launcher: ^6.2.0
   flutter_secure_storage: ^9.1.0
 
@@ -153,7 +153,7 @@ class PkceUtil {
 ### lib/services/oauth_service.dart
 
 ```dart
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:agora_app/utils/pkce_util.dart';
 import 'package:agora_app/core/utils/secure_storage.dart';
@@ -164,7 +164,8 @@ class OAuthService {
   static const String _clientId = 'flutter_mobile';
 
   final _storage = SecureStorageManager();
-  StreamSubscription? _deepLinkSubscription;
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _deepLinkSubscription;
 
   String? _codeVerifier;
   Function(String)? _onAuthSuccess;
@@ -178,23 +179,14 @@ class OAuthService {
     _onAuthSuccess = onAuthSuccess;
     _onAuthError = onAuthError;
 
-    _deepLinkSubscription = uriLinkStream.listen(
-      (String? link) {
-        if (link != null) {
-          _handleDeepLink(link);
-        }
+    _deepLinkSubscription = _appLinks.uriLinkStream.listen(
+      (Uri uri) {
+        _handleDeepLink(uri.toString());
       },
       onError: (err) {
         _onAuthError?.call('Deep link error: $err');
       },
     );
-
-    // 앱 실행 중 Deep Link 처리
-    uriLinkStream.listen((String? link) {
-      if (link != null) {
-        _handleDeepLink(link);
-      }
-    });
   }
 
   /// Deep Link 처리 (Authorization Code 추출)
