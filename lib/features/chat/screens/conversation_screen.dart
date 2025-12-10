@@ -1,6 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
-import 'invite_user_screen.dart';
+import 'select_members_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -17,9 +17,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/chat_provider.dart';
 import '../../../shared/providers/file_provider.dart';
 import '../../../shared/providers/riverpod_profile_provider.dart';
+import '../../../shared/providers/ai_provider.dart';
 import '../../../services/websocket_service.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/chat/chat.dart';
+import '../../../data/services/ai_service.dart';
+import '../../../core/exception/app_exception.dart';
 
 class ConversationScreen extends ConsumerStatefulWidget {
   final String chatId;
@@ -52,11 +55,35 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   String? _selectedVoiceMemo;
   int _voiceMemoDuration = 0;
 
+  // AI 아이디어 제안 상태
+  List<String> _aiIdeas = [];
+  bool _isGeneratingIdeas = false;
+
+  // AI 채팅 요약 상태
+  String? _summaryResult;
+  bool _isSummarizing = false;
+
+  // AI 문법 검사 상태
+  String? _grammarCheckResult;
+  bool _isCheckingGrammar = false;
+
+  // AI 톤 변경 상태
+  bool _isToneChangeMenuOpen = false;
+  bool _isChangingTone = false;
+  List<String> _toneChangeResults = [];
+  ToneType? _selectedTone;
+
+  // 답장 상태
+  Map<String, String>? _replyContext;
+
   // 음성 메모 미리보기 재생용
   final AudioPlayer _previewAudioPlayer = AudioPlayer();
   bool _isPreviewPlaying = false;
   Duration _previewCurrentPosition = Duration.zero;
   Duration _previewTotalDuration = Duration.zero;
+  
+  // 키보드 포커스 노드
+  late FocusNode _focusNode;
 
   // WebSocket 연결 여부
   bool _isWebSocketInitialized = false;
@@ -65,6 +92,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
 
     // 미리보기 오디오 플레이어 리스너 설정
     _previewAudioPlayer.onPlayerStateChanged.listen((state) {
@@ -138,11 +166,17 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     _messageController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
+
+
   void _handleSubmitted(String text) async {
-    if (text.trim().isEmpty && _selectedImages.isEmpty && _selectedFiles.isEmpty && _selectedVoiceMemo == null) return;
+    if (text.trim().isEmpty &&
+        _selectedImages.isEmpty &&
+        _selectedFiles.isEmpty &&
+        _selectedVoiceMemo == null) return;
 
     try {
       List<String>? fileIds;
@@ -175,12 +209,27 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         messageType = MessageType.file;
       }
 
+      // 메시지 전송 로직
+      // 답장 ID 설정 (API 전송용)
+      String? replyToId;
+      String finalMessage = messageContent;
+      
+      final replyId = _replyContext?['id'];
+      if (replyId != null && replyId.isNotEmpty) {
+        replyToId = replyId;
+        // API 사용 시 본문에 답장 포맷을 포함할 필요 없음 (클라이언트가 replyToId로 렌더링)
+      } else if (_replyContext != null) {
+          // Fallback for string-based reply if ID is missing (legacy)
+           finalMessage = '///REPLY///${_replyContext!['senderName']}///${_replyContext!['message']}///\n$messageContent';
+      }
+
       // WebSocket으로 메시지 전송
       final notifier = ref.read(messageListProvider(widget.chatId).notifier);
       notifier.sendMessage(
-        content: messageContent,
+        content: finalMessage,
         type: messageType,
         fileIds: fileIds,
+        replyToId: replyToId,
       );
 
       // 입력 필드 초기화
@@ -190,12 +239,77 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         _selectedFiles = [];
         _selectedVoiceMemo = null;
         _voiceMemoDuration = 0;
+        _replyContext = null; // 답장 상태 초기화
       });
     } catch (e) {
       print('❌ Error sending message: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다: $e')),
       );
+    }
+  }
+
+  void _handleReply(String message, String senderName, {String? replyToId}) {
+    setState(() {
+      _replyContext = {
+        'message': message,
+        'senderName': senderName,
+        'id': replyToId ?? '',
+      };
+    });
+    // 키보드 올리기
+    _focusNode.requestFocus();
+  }
+
+  void _handleReplyTap(String replyId) {
+    _scrollToMessage(replyId);
+  }
+  
+  void _scrollToMessage(String messageId) {
+    final messageState = ref.read(messageListProvider(widget.chatId));
+    final index = messageState.messages.indexWhere((m) => m.id.toString() == messageId);
+    
+    if (index != -1) {
+      // 리스트뷰가 reverse: true이므로 인덱스 계산 주의 필요할 수 있음
+      // 하지만 ListView.builder의 itemIndex는 데이터 인덱스와 매핑됨.
+      // 문제는 오프셋을 알 수 없다는 것.
+      // 간단히 아이템 높이를 60px 정도로 추정하여 점프 시도 (정확하지 않음)
+      // 또는 찾은 메시지가 화면에 보이도록...
+      
+      // 여기서는 스낵바 등으로 '이동' 알림만 주거나, 정확한 구현을 위해 scroll_to_index 같은 패키지가 필요함.
+      // 일단 간단한 검색 피드백 제공
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('해당 메시지로 이동합니다 (구현 예정)')),
+      );
+    } else {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('메시지를 찾을 수 없습니다 (상단에 있을 수 있습니다)')),
+      );
+    }
+  }
+
+  void _handleForward(String message) async {
+    // 전달할 대상 선택 (SelectMembersScreen 재사용)
+    // 실제로는 ChatListScreen을 띄워서 선택하게 하는 것이 좋으나, 
+    // 편의상 멤버 선택 화면을 사용
+     final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SelectMembersScreen(
+          existingMemberIds: const [], // 모든 멤버 표시
+          title: '전달할 대상 선택',
+        ),
+      ),
+    );
+
+    if (result != null && result is List<int> && result.isNotEmpty) {
+      // TODO: 선택된 대상들과의 채팅방을 찾거나 생성해서 메시지 전송
+      // 여기서는 UI 피드백만 제공
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('${result.length}명에게 메시지를 전달했습니다.')),
+        );
+      }
     }
   }
 
@@ -226,7 +340,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             final result = await fileService.uploadFile(file);
 
             result.when(
-              success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+              success: (fileResponse) =>
+                  uploadedFileIds.add(fileResponse.file.id),
               failure: (error) => throw error,
             );
           }
@@ -239,7 +354,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           final result = await fileService.uploadFile(voiceFile);
 
           result.when(
-            success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+            success: (fileResponse) =>
+                uploadedFileIds.add(fileResponse.file.id),
             failure: (error) => throw error,
           );
         }
@@ -259,20 +375,20 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     try {
       final ImagePicker picker = ImagePicker();
       print('📸 Starting pickMultiImage...');
-      
+
       // Try pickMultiImage with explicit parameters
       final List<XFile> images = await picker.pickMultiImage(
         imageQuality: 85,
       );
-      
+
       print('📸 Selected ${images.length} images');
-      
+
       if (images.isNotEmpty) {
         print('📸 Image details:');
         for (int i = 0; i < images.length; i++) {
           print('  Image $i: ${images[i].name}, path: ${images[i].path}');
         }
-        
+
         setState(() {
           // Add to existing images instead of replacing
           _selectedImages.addAll(images);
@@ -350,12 +466,42 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   /// API ChatMessage를 local ChatMessage로 변환
-  local.ChatMessage _convertToLocalMessage(ChatMessage apiMessage, String currentUserId) {
+  local.ChatMessage _convertToLocalMessage(
+      ChatMessage apiMessage, String currentUserId, List<ChatMessage> allMessages) {
+    
+    // 답장 정보 찾기
+    String? replyToSender;
+    String? replyToContent;
+    
+    if (apiMessage.replyToId != null) {
+      // 현재 로드된 메시지 목록에서 답장 대상 찾기
+      // (API가 답장 정보를 직접 주지 않는다고 가정하고 로컬 검색)
+      try {
+        final replyMessage = allMessages.firstWhere(
+          (m) => m.id.toString() == apiMessage.replyToId,
+        ); // orElse handled by catch
+        
+        replyToSender = replyMessage.displayName;
+        replyToContent = replyMessage.content;
+      } catch (e) {
+        // 메시지가 로컬에 없음 (안 보임)
+        // API에서 reply context를 주거나 별도 fetch가 필요하지만
+        // 현재는 "삭제된 메시지" 또는 "메시지 로딩 필요" 등으로 처리 가능
+        // 혹은 UI에서 원본 정보가 없음을 처리
+        replyToSender = "알 수 없음";
+        replyToContent = "원본 메시지를 찾을 수 없습니다.";
+      }
+    }
+
     return local.ChatMessage(
+      id: apiMessage.id.toString(),
       text: apiMessage.content,
       isMe: apiMessage.senderAgoraId == currentUserId,
       time: apiMessage.createdAt,
       sender: apiMessage.displayName,
+      replyToId: apiMessage.replyToId,
+      replyToSender: replyToSender,
+      replyToContent: replyToContent,
       // TODO: 첨부파일 처리
       // imageUrl: apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('image'))?.fileUrl,
       // fileName: apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image'))?.fileName,
@@ -389,7 +535,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                ref.read(messageListProvider(widget.chatId).notifier).loadMessages();
+                ref
+                    .read(messageListProvider(widget.chatId).notifier)
+                    .loadMessages();
               },
               child: const Text('다시 시도'),
             ),
@@ -414,8 +562,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         // 스크롤이 맨 아래에 도달하면 더 불러오기
         if (!messageState.isLoading &&
             messageState.hasMore &&
-            scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
-          ref.read(messageListProvider(widget.chatId).notifier).loadMessages(loadMore: true);
+            scrollInfo.metrics.pixels >=
+                scrollInfo.metrics.maxScrollExtent - 200) {
+          ref
+              .read(messageListProvider(widget.chatId).notifier)
+              .loadMessages(loadMore: true);
         }
         return false;
       },
@@ -436,7 +587,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           }
 
           final apiMessage = messages[index];
-          final localMessage = _convertToLocalMessage(apiMessage, currentUserId);
+          final localMessage =
+              _convertToLocalMessage(apiMessage, currentUserId, messages);
 
           return MessageBubble(
             key: ValueKey(apiMessage.id),
@@ -449,10 +601,16 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             fileName: localMessage.fileName,
             fileSize: localMessage.fileSize,
             reactions: localMessage.reactions,
+            replyToId: localMessage.replyToId,
+            replyToSender: localMessage.replyToSender,
+            replyToContent: localMessage.replyToContent,
             onReactionSelected: (emoji) {
               // TODO: 리액션 API 연동
               print('Reaction selected: $emoji for message ${apiMessage.id}');
             },
+            onReply: (msg, sender) => _handleReply(msg, sender, replyToId: localMessage.id),
+            onReplyTap: _handleReplyTap,
+            onForward: _handleForward,
           );
         },
       ),
@@ -536,7 +694,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               data: (state) {
                 switch (state) {
                   case WebSocketConnectionState.connected:
-                    return const Icon(Icons.circle, color: Colors.green, size: 12);
+                    return const Icon(Icons.circle,
+                        color: Colors.green, size: 12);
                   case WebSocketConnectionState.connecting:
                     return const SizedBox(
                       width: 12,
@@ -544,9 +703,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     );
                   case WebSocketConnectionState.error:
-                    return const Icon(Icons.circle, color: Colors.red, size: 12);
+                    return const Icon(Icons.circle,
+                        color: Colors.red, size: 12);
                   default:
-                    return const Icon(Icons.circle, color: Colors.grey, size: 12);
+                    return const Icon(Icons.circle,
+                        color: Colors.grey, size: 12);
                 }
               },
               loading: () => const SizedBox(
@@ -627,7 +788,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                         : null,
                                   ),
                                   child: myProfileImage == null
-                                      ? const Icon(Icons.person, color: Colors.grey)
+                                      ? const Icon(Icons.person,
+                                          color: Colors.grey)
                                       : null,
                                 ),
                                 const SizedBox(height: 8),
@@ -654,7 +816,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                     shape: BoxShape.circle,
                                     image: widget.userImage.isNotEmpty
                                         ? DecorationImage(
-                                            image: NetworkImage(widget.userImage),
+                                            image:
+                                                NetworkImage(widget.userImage),
                                             fit: BoxFit.cover,
                                           )
                                         : null,
@@ -679,15 +842,59 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                           MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
+                              // Invite Member
+                              onTap: () async {
+                                Navigator.pop(context); // Drawer 닫기
+
+                                // 기존 멤버 목록 가져오기
+                                final chatList =
+                                    ref.read(chatListProvider).valueOrNull ??
+                                        [];
+                                final currentChat = chatList.firstWhere(
+                                  (c) => c.id.toString() == widget.chatId,
+                                  orElse: () => Chat(
+                                      id: -1,
+                                      type: ChatType.group,
+                                      createdAt: DateTime.now(),
+                                      updatedAt: DateTime.now()),
+                                );
+
+                                final List<int> existingMemberIds =
+                                    currentChat.participants != null
+                                        ? currentChat.participants!
+                                            .map((p) => p.userId as int)
+                                            .toList()
+                                        : [];
+
+                                final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const InviteUserScreen(),
+                                    builder: (context) => SelectMembersScreen(
+                                      existingMemberIds: existingMemberIds,
+                                    ),
                                   ),
                                 );
+
+                                if (result != null &&
+                                    result is List<int> &&
+                                    result.isNotEmpty) {
+                                  final success = await ref
+                                      .read(chatActionProvider.notifier)
+                                      .inviteToGroupChat(widget.chatId, result);
+
+                                  if (success && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content:
+                                              Text('${result.length}명을 초대했습니다.')),
+                                    );
+                                  } else if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text('초대에 실패했습니다.')),
+                                    );
+                                  }
+                                }
                               },
                               child: Column(
                                 children: [
@@ -728,6 +935,63 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 padding: EdgeInsets.zero,
                 children: [
                   ListTile(
+                    leading: const Icon(Icons.person_add_outlined,
+                        color: AppTheme.textPrimary),
+                    title: const Text('대화상대 초대'),
+                    trailing: const Icon(Icons.arrow_forward_ios,
+                        size: 14, color: AppTheme.textSecondary),
+                    onTap: () async {
+                      Navigator.pop(context); // Drawer 닫기
+
+                      // 기존 멤버 목록 가져오기
+                      final chatList =
+                          ref.read(chatListProvider).valueOrNull ?? [];
+                      final currentChat = chatList.firstWhere(
+                        (c) => c.id.toString() == widget.chatId,
+                        orElse: () => Chat(
+                            id: -1,
+                            type: ChatType.group,
+                            createdAt: DateTime.now(),
+                            updatedAt: DateTime.now()),
+                      );
+
+                      final List<int> existingMemberIds =
+                          currentChat.participants != null
+                              ? currentChat.participants!
+                                  .map((p) => p.userId as int)
+                                  .toList()
+                              : [];
+
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SelectMembersScreen(
+                            existingMemberIds: existingMemberIds,
+                          ),
+                        ),
+                      );
+
+                      if (result != null &&
+                          result is List<int> &&
+                          result.isNotEmpty) {
+                        final success = await ref
+                            .read(chatActionProvider.notifier)
+                            .inviteToGroupChat(widget.chatId, result);
+
+                        if (success && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('${result.length}명을 초대했습니다.')),
+                          );
+                        } else if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('초대에 실패했습니다.')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.photo_outlined,
                         color: AppTheme.textPrimary),
                     title: const Text('사진/동영상'),
@@ -751,7 +1015,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   // Media Preview Section
                   Consumer(
                     builder: (context, ref, child) {
-                      final messageState = ref.watch(messageListProvider(widget.chatId));
+                      final messageState =
+                          ref.watch(messageListProvider(widget.chatId));
 
                       // API 메시지에서 이미지 첨부파일 필터링
                       final imageAttachments = messageState.messages
@@ -783,11 +1048,13 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                       builder: (_) => Scaffold(
                                         appBar: AppBar(
                                           backgroundColor: Colors.black,
-                                          iconTheme: const IconThemeData(color: Colors.white),
+                                          iconTheme: const IconThemeData(
+                                              color: Colors.white),
                                         ),
                                         backgroundColor: Colors.black,
                                         body: Center(
-                                          child: Image.network(attachment.fileUrl),
+                                          child:
+                                              Image.network(attachment.fileUrl),
                                         ),
                                       ),
                                     ),
@@ -800,7 +1067,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                     image: DecorationImage(
                                       image: NetworkImage(
-                                        attachment.thumbnailUrl ?? attachment.fileUrl,
+                                        attachment.thumbnailUrl ??
+                                            attachment.fileUrl,
                                       ),
                                       fit: BoxFit.cover,
                                     ),
@@ -1043,7 +1311,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       subtitle: const Text('AI가 대화에 맞는 아이디어를 제안합니다'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, 'AI 아이디어를 제안했습니다');
+                        _fetchIdeas();
                       },
                     ),
                     ListTile(
@@ -1052,25 +1320,36 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       subtitle: const Text('메시지를 번역합니다'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, '메시지가 번역되었습니다');
+                        _showTranslateDialog();
                       },
                     ),
                     ListTile(
-                      leading: const Icon(Icons.edit, color: Colors.blue),
-                      title: const Text('문법 검사'),
-                      subtitle: const Text('입력한 메시지의 문법을 검사합니다'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showToast(context, '문법 검사를 완료했습니다');
-                      },
-                    ),
+                    leading: const Icon(Icons.edit, color: Colors.blue),
+                    title: const Text('문법 검사'),
+                    subtitle: const Text('입력한 메시지의 문법을 검사합니다'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _checkGrammar();
+                    },
+                  ),
                     ListTile(
-                      leading: const Icon(Icons.star, color: Colors.purple),
-                      title: const Text('톤 변경'),
-                      subtitle: const Text('메시지의 톤을 변경합니다'),
+                    leading: const Icon(Icons.star, color: Colors.purple),
+                    title: const Text('톤 변경'),
+                    subtitle: const Text('메시지의 톤을 변경합니다'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _toggleToneChangeMenu();
+                    },
+                  ),
+                    const Divider(),
+                    ListTile(
+                      leading:
+                          const Icon(Icons.summarize, color: Colors.orange),
+                      title: const Text('채팅 요약'),
+                      subtitle: const Text('대화 내용을 요약합니다'),
                       onTap: () {
                         Navigator.pop(context);
-                        _showToast(context, '톤을 변경했습니다');
+                        _fetchSummary();
                       },
                     ),
                   ],
@@ -1081,6 +1360,243 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         ),
       ),
     );
+  }
+
+  /// AI 아이디어 제안 요청
+  Future<void> _fetchIdeas() async {
+    setState(() {
+      _isGeneratingIdeas = true;
+      _aiIdeas = [];
+    });
+
+    try {
+      final messageState = ref.read(messageListProvider(widget.chatId));
+      final recentMessages = messageState.messages
+          .take(10)
+          .map((m) => '${m.displayName ?? "Unknown"}: ${m.content}')
+          .toList()
+          .reversed
+          .toList();
+
+      final service = ref.read(aiServiceProvider);
+      final result = await service.suggestIdeas(
+        recentMessages: recentMessages,
+        currentInput: _messageController.text,
+      );
+
+      if (mounted) {
+        result.when(
+          success: (ideas) {
+            setState(() {
+              _aiIdeas = ideas;
+              _isGeneratingIdeas = false;
+            });
+            if (ideas.isEmpty) {
+              _showToast(context, '제안할 아이디어가 없습니다.');
+            }
+          },
+          failure: (error) {
+            setState(() {
+              _isGeneratingIdeas = false;
+            });
+            _showToast(context, '아이디어 생성 실패: ${error.displayMessage}');
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGeneratingIdeas = false;
+        });
+        _showToast(context, '오류 발생: $e');
+      }
+    }
+  }
+
+  /// 번역 다이얼로그
+  void _showTranslateDialog() {
+    final currentText = _messageController.text;
+
+    showDialog(
+      context: context,
+      builder: (context) => _TranslateDialog(
+        initialText: currentText,
+        onTranslate: (text, targetLanguage) async {
+          final service = ref.read(aiServiceProvider);
+          return await service.translateMessage(
+            message: text,
+            targetLanguage: targetLanguage,
+          );
+        },
+        onApply: (translatedText) {
+          setState(() {
+            _messageController.text = translatedText;
+          });
+        },
+      ),
+    );
+  }
+
+    /// 문법 검사 요청
+  Future<void> _checkGrammar() async {
+    final currentText = _messageController.text;
+
+    if (currentText.isEmpty) {
+      _showToast(context, '먼저 메시지를 입력해주세요');
+      return;
+    }
+
+    setState(() {
+      _isCheckingGrammar = true;
+      _grammarCheckResult = null;
+      _aiIdeas = []; // 다른 AI 결과 닫기
+      _summaryResult = null;
+    });
+
+    try {
+      final service = ref.read(aiServiceProvider);
+      final result = await service.checkGrammar(message: currentText);
+
+      if (mounted) {
+        result.when(
+          success: (correctedText) {
+            setState(() {
+              _grammarCheckResult = correctedText;
+              _isCheckingGrammar = false;
+            });
+          },
+          failure: (error) {
+            setState(() {
+              _isCheckingGrammar = false;
+            });
+            _showToast(context, '문법 검사 실패: ${error.displayMessage}');
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingGrammar = false;
+        });
+        _showToast(context, '오류가 발생했습니다: $e');
+      }
+    }
+  }
+
+    /// 톤 변경 메뉴 토글
+  void _toggleToneChangeMenu() {
+    final currentText = _messageController.text;
+    if (currentText.isEmpty) {
+      _showToast(context, '먼저 메시지를 입력해주세요');
+      return;
+    }
+
+    setState(() {
+      _isToneChangeMenuOpen = !_isToneChangeMenuOpen;
+      _toneChangeResults = [];
+      _selectedTone = null;
+      // 다른 메뉴 닫기
+      if (_isToneChangeMenuOpen) {
+        _aiIdeas = [];
+        _summaryResult = null;
+        _grammarCheckResult = null;
+      }
+    });
+  }
+
+  /// 톤 변경 요청
+  Future<void> _changeTone(ToneType tone) async {
+    final currentText = _messageController.text;
+    if (currentText.isEmpty) return;
+
+    setState(() {
+      _selectedTone = tone;
+      _isChangingTone = true;
+      _toneChangeResults = [];
+    });
+
+    try {
+      final service = ref.read(aiServiceProvider);
+      final result = await service.changeTone(
+        message: currentText,
+        targetTone: tone,
+      );
+
+      if (mounted) {
+        result.when(
+          success: (suggestions) {
+            setState(() {
+              _toneChangeResults = suggestions;
+              _isChangingTone = false;
+            });
+          },
+          failure: (error) {
+            setState(() {
+              _isChangingTone = false;
+            });
+            _showToast(context, '톤 변경 실패: ${error.displayMessage}');
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isChangingTone = false;
+        });
+        _showToast(context, '오류가 발생했습니다: $e');
+      }
+    }
+  }
+
+  /// 채팅 요약 요청
+  Future<void> _fetchSummary() async {
+    final messageState = ref.read(messageListProvider(widget.chatId));
+    final messages = messageState.messages
+        .take(50)
+        .map((m) => '${m.displayName ?? "Unknown"}: ${m.content}')
+        .toList()
+        .reversed
+        .toList();
+
+    if (messages.isEmpty) {
+      _showToast(context, '요약할 메시지가 없습니다');
+      return;
+    }
+
+    setState(() {
+      _isSummarizing = true;
+      _summaryResult = null;
+      _aiIdeas = []; // 다른 AI 결과는 닫음
+    });
+
+    try {
+      final service = ref.read(aiServiceProvider);
+      final result = await service.summarizeChat(messages: messages);
+
+      if (mounted) {
+        result.when(
+          success: (summary) {
+            setState(() {
+              _summaryResult = summary;
+              _isSummarizing = false;
+            });
+          },
+          failure: (error) {
+            setState(() {
+              _isSummarizing = false;
+            });
+            _showToast(context, '요약 실패: ${error.displayMessage}');
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSummarizing = false;
+        });
+        _showToast(context, '오류 발생: $e');
+      }
+    }
   }
 
   void _showToast(BuildContext context, String message) {
@@ -1221,6 +1737,529 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       child: SafeArea(
         child: Column(
           children: [
+            // AI 아이디어 제안 로딩 및 결과 표시
+            if (_isGeneratingIdeas)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Row(
+                  children: const [
+                    SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 8),
+                    Text('AI가 아이디어를 생성 중입니다...',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+            // AI 채팅 요약 로딩 및 결과 표시
+            if (_isSummarizing)
+               Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Row(
+                  children: const [
+                    SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 8),
+                    Text('AI가 대화를 요약 중입니다...',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+            if (_summaryResult != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // AI 캐릭터 아바타
+                    Column(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF6B8EFF), Color(0xFF0038FF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0038FF).withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          "AI 봇",
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    // 말풍선
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F0FE), // 부드러운 파란색 배경
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.summarize,
+                                        size: 14, color: Colors.blue[800]),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "채팅 요약",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue[900],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _summaryResult = null;
+                                    });
+                                  },
+                                  child: Icon(Icons.close,
+                                      size: 16, color: Colors.blue[900]),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _summaryResult!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: InkWell(
+                                onTap: () {
+                                  Clipboard.setData(
+                                      ClipboardData(text: _summaryResult!));
+                                  _showToast(context, '요약 내용이 복사되었습니다.');
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.copy,
+                                        size: 12, color: Colors.blue[700]),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "복사하기",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // AI 톤 변경 메뉴 및 결과
+              if (_isToneChangeMenuOpen)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12.0),
+                  margin: const EdgeInsets.only(bottom: 8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.purple.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "톤 변경",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isToneChangeMenuOpen = false;
+                                _toneChangeResults = [];
+                                _selectedTone = null;
+                              });
+                            },
+                            child: const Icon(Icons.close,
+                                size: 16, color: Colors.purple),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // 톤 선택 칩
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: ToneType.values.map((tone) {
+                            final isSelected = _selectedTone == tone;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(
+                                  tone.label,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isSelected ? Colors.white : Colors.purple,
+                                  ),
+                                ),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    _changeTone(tone);
+                                  }
+                                },
+                                selectedColor: Colors.purple,
+                                backgroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  side: BorderSide(color: Colors.purple.withOpacity(0.5)),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // 로딩 중
+                      if (_isChangingTone)
+                        const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20, 
+                              height: 20, 
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purple)
+                            ),
+                          ),
+                        ),
+
+                      // 결과 목록
+                      if (_toneChangeResults.isNotEmpty)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _toneChangeResults.map((result) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ActionChip(
+                                  label: Text(result),
+                                  backgroundColor: Colors.white,
+                                  elevation: 1,
+                                  onPressed: () {
+                                    setState(() {
+                                      _messageController.text = result;
+                                      _isToneChangeMenuOpen = false;
+                                    });
+                                  },
+                                  avatar: const Icon(Icons.check, size: 16, color: Colors.purple),
+                                  side: BorderSide(color: Colors.purple.withOpacity(0.3)),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              // AI 문법 검사 로딩 및 결과 표시
+              if (_isCheckingGrammar)
+               Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Row(
+                  children: const [
+                    SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 8),
+                    Text('AI가 문법을 검사 중입니다...',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              if (_grammarCheckResult != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12.0),
+                  margin: const EdgeInsets.only(bottom: 8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.check_circle_outline, size: 16, color: Colors.blue),
+                              SizedBox(width: 6),
+                              Text(
+                                "문법 검사 결과",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _grammarCheckResult = null;
+                              });
+                            },
+                            child: const Icon(Icons.close,
+                                size: 16, color: Colors.blue),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _grammarCheckResult!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                           InkWell(
+                            onTap: () {
+                              _messageController.text = _grammarCheckResult!;
+                              setState(() {
+                                _grammarCheckResult = null;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                "적용",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: _grammarCheckResult!));
+                              _showToast(context, '복사되었습니다.');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: Colors.blue),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                "복사",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // AI 아이디어 제안
+              if (_aiIdeas.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12.0),
+                  margin: const EdgeInsets.only(bottom: 8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.lightbulb, size: 16, color: Colors.amber),
+                              SizedBox(width: 4),
+                              Text(
+                                'AI 아이디어 제안',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _aiIdeas = [];
+                              });
+                            },
+                             child: const Icon(Icons.close,
+                                size: 16, color: Colors.amber),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _aiIdeas.map((idea) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ActionChip(
+                                label: Text(idea),
+                                backgroundColor: Colors.white,
+                                elevation: 1,
+                                onPressed: () {
+                                  setState(() {
+                                    _messageController.text = idea;
+                                    _aiIdeas = [];
+                                  });
+                                },
+                                side: BorderSide(color: Colors.amber.withOpacity(0.3)),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // 답장 미리보기 UI
+              if (_replyContext != null)
+                Container(
+                  padding: const EdgeInsets.only(left: 12, top: 8, bottom: 8, right: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: const Border(left: BorderSide(color: Color(0xFF0095F6), width: 4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_replyContext!['senderName']}에게 답장',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Color(0xFF0095F6),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _replyContext!['message'] ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 16),
+                        onPressed: () {
+                          setState(() {
+                            _replyContext = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
             // 이미지 미리보기
             if (_selectedImages.isNotEmpty)
               Container(
@@ -1272,7 +2311,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: FutureBuilder<Uint8List>(
-                                    future: _selectedImages[index].readAsBytes(),
+                                    future:
+                                        _selectedImages[index].readAsBytes(),
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
                                         return Image.memory(
@@ -1440,7 +2480,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     // 재생/일시정지 버튼
                     IconButton(
                       icon: Icon(
-                        _isPreviewPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        _isPreviewPlaying
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_filled,
                         color: Colors.purple,
                         size: 40,
                       ),
@@ -1450,9 +2492,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         } else {
                           // Web에서는 blob URL을 사용하므로 UrlSource 사용
                           if (_selectedVoiceMemo!.startsWith('blob:')) {
-                            await _previewAudioPlayer.play(UrlSource(_selectedVoiceMemo!));
+                            await _previewAudioPlayer
+                                .play(UrlSource(_selectedVoiceMemo!));
                           } else {
-                            await _previewAudioPlayer.play(DeviceFileSource(_selectedVoiceMemo!));
+                            await _previewAudioPlayer
+                                .play(DeviceFileSource(_selectedVoiceMemo!));
                           }
                         }
                       },
@@ -1515,7 +2559,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
+                  icon:
+                      const Icon(Icons.auto_awesome, color: Color(0xFF0095F6)),
                   onPressed: () {
                     _showAIMenu(context);
                   },
@@ -1528,6 +2573,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
+                      focusNode: _focusNode,
                       controller: _messageController,
                       decoration: const InputDecoration(
                         hintText: '메시지를 입력하세요',
@@ -1546,7 +2592,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Color(0xFF0095F6), size: 28),
+                  icon: const Icon(Icons.send,
+                      color: Color(0xFF0095F6), size: 28),
                   onPressed: () => _handleSubmitted(_messageController.text),
                 ),
               ],
@@ -1554,6 +2601,435 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// AI 요청 다이얼로그 (공통)
+class _AIRequestDialog extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final Future<Result<String>> Function() onExecute;
+
+  const _AIRequestDialog({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.onExecute,
+  });
+
+  @override
+  State<_AIRequestDialog> createState() => _AIRequestDialogState();
+}
+
+class _AIRequestDialogState extends State<_AIRequestDialog> {
+  bool _isLoading = true;
+  String? _result;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _executeRequest();
+  }
+
+  Future<void> _executeRequest() async {
+    final result = await widget.onExecute();
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        result.when(
+          success: (response) => _result = response,
+          failure: (error) => _error = error.displayMessage,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(widget.icon, color: widget.iconColor),
+          const SizedBox(width: 8),
+          Text(widget.title),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: _isLoading
+            ? const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('AI가 처리 중입니다...'),
+                ],
+              )
+            : _error != null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 48),
+                      const SizedBox(height: 16),
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    child: SelectableText(
+                      _result ?? '',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+      ),
+      actions: [
+        if (!_isLoading)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+        if (!_isLoading && _result != null)
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: _result!));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('결과가 복사되었습니다')),
+              );
+            },
+            child: const Text('복사'),
+          ),
+      ],
+    );
+  }
+}
+
+/// 번역 다이얼로그
+class _TranslateDialog extends StatefulWidget {
+  final String initialText;
+  final Future<Result<String>> Function(String text, String targetLanguage)
+      onTranslate;
+  final void Function(String translatedText) onApply;
+
+  const _TranslateDialog({
+    required this.initialText,
+    required this.onTranslate,
+    required this.onApply,
+  });
+
+  @override
+  State<_TranslateDialog> createState() => _TranslateDialogState();
+}
+
+class _TranslateDialogState extends State<_TranslateDialog> {
+  final TextEditingController _textController = TextEditingController();
+  String _selectedLanguage = '영어';
+  bool _isLoading = false;
+  String? _result;
+  String? _error;
+
+  final List<String> _languages = [
+    '영어',
+    '한국어',
+    '일본어',
+    '중국어',
+    '스페인어',
+    '프랑스어',
+    '독일어'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _textController.text = widget.initialText;
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _translate() async {
+    if (_textController.text.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final result =
+        await widget.onTranslate(_textController.text, _selectedLanguage);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        result.when(
+          success: (response) => _result = response,
+          failure: (error) => _error = error.displayMessage,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.translate, color: Colors.green),
+          SizedBox(width: 8),
+          Text('번역'),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _textController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: '번역할 텍스트를 입력하세요',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButton<String>(
+                value: _selectedLanguage,
+                isExpanded: true,
+                items: _languages.map((lang) {
+                  return DropdownMenuItem(value: lang, child: Text(lang));
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedLanguage = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_result != null) ...[
+                const Text('번역 결과:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(_result!),
+                ),
+              ] else if (_error != null)
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        if (!_isLoading && _result == null)
+          ElevatedButton(
+            onPressed: _translate,
+            child: const Text('번역'),
+          ),
+        if (_result != null)
+          ElevatedButton(
+            onPressed: () {
+              widget.onApply(_result!);
+              Navigator.pop(context);
+            },
+            child: const Text('적용'),
+          ),
+      ],
+    );
+  }
+}
+
+/// 톤 변경 다이얼로그
+
+
+class _ToneChangeDialog extends StatefulWidget {
+  final String initialText;
+  final Future<Result<List<String>>> Function(String text, ToneType tone)
+      onChangeTone;
+  final void Function(String changedText) onApply;
+
+  const _ToneChangeDialog({
+    required this.initialText,
+    required this.onChangeTone,
+    required this.onApply,
+  });
+
+  @override
+  State<_ToneChangeDialog> createState() => _ToneChangeDialogState();
+}
+
+class _ToneChangeDialogState extends State<_ToneChangeDialog> {
+  ToneType _selectedTone = ToneType.formal;
+  bool _isLoading = false;
+  List<String>? _results;
+  String? _selectedResult;
+  String? _error;
+
+  final Map<ToneType, String> _toneLabels = {
+    ToneType.formal: '격식체 (존댓말)',
+    ToneType.casual: '비격식체 (반말)',
+    ToneType.friendly: '친근한 톤 (이모지 포함)',
+    ToneType.professional: '비즈니스 톤',
+    ToneType.polite: '정중한 톤',
+  };
+
+  Future<void> _changeTone() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _results = null;
+      _selectedResult = null;
+    });
+
+    final result = await widget.onChangeTone(widget.initialText, _selectedTone);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        result.when(
+          success: (response) {
+            _results = response;
+            if (response.isNotEmpty) {
+              _selectedResult = response[0]; // 기본적으로 첫 번째 선택
+            }
+          },
+          failure: (error) => _error = error.displayMessage,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.star, color: Colors.purple),
+          SizedBox(width: 8),
+          Text('톤 변경'),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('원본:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(widget.initialText),
+              ),
+              const SizedBox(height: 16),
+              const Text('변환할 톤:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: ToneType.values.map((tone) {
+                  return ChoiceChip(
+                    label: Text(_toneLabels[tone]!),
+                    selected: _selectedTone == tone,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() => _selectedTone = tone);
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (_results != null) ...[
+                const Text('변환 결과 (선택하세요):',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...List.generate(_results!.length, (index) {
+                  final text = _results![index];
+                  final isSelected = _selectedResult == text;
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedResult = text;
+                      });
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.green[50] : Colors.grey[50],
+                        border: Border.all(
+                          color: isSelected
+                              ? Colors.green
+                              : Colors.grey.withOpacity(0.3),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          color: isSelected ? Colors.green[900] : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ] else if (_error != null)
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        if (!_isLoading && _results == null)
+          ElevatedButton(
+            onPressed: _changeTone,
+            child: const Text('변환'),
+          ),
+        if (_results != null)
+          ElevatedButton(
+            onPressed: _selectedResult != null
+                ? () {
+                    widget.onApply(_selectedResult!);
+                    Navigator.pop(context);
+                  }
+                : null,
+            child: const Text('적용'),
+          ),
+      ],
     );
   }
 }

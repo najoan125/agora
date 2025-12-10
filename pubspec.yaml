@@ -50,6 +50,7 @@ dependencies:
   # Model Generation
   freezed_annotation: ^2.4.1
   json_annotation: ^4.8.1
+  google_generative_ai: ^0.4.7
 
 dev_dependencies:
   flutter_test:
