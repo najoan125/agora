@@ -174,9 +174,9 @@ class TeamService {
   // ============ Team Profile ============
 
   /// 내 팀 프로필 조회
-  Future<Result<TeamProfile>> getMyTeamProfile(String teamId) async {
+  Future<Result<TeamProfile>> getMyTeamProfile() async {
     try {
-      final response = await _apiClient.get(ApiEndpoints.teamProfile(teamId));
+      final response = await _apiClient.get(ApiEndpoints.teamProfile);
       return Success(TeamProfile.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
@@ -186,15 +186,31 @@ class TeamService {
     }
   }
 
+  /// 팀 프로필 존재 여부 확인
+  Future<Result<bool>> checkTeamProfileExists() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.teamProfileExists);
+      return Success(response.data['exists'] == true);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
   /// 팀 프로필 생성
-  Future<Result<TeamProfile>> createTeamProfile(
-    String teamId, {
+  Future<Result<TeamProfile>> createTeamProfile({
     required String displayName,
+    String? profileImage,
   }) async {
     try {
       final response = await _apiClient.post(
-        ApiEndpoints.teamProfile(teamId),
-        data: {'displayName': displayName},
+        ApiEndpoints.teamProfile,
+        data: {
+          'displayName': displayName,
+          if (profileImage != null) 'profileImage': profileImage,
+        },
       );
       return Success(TeamProfile.fromJson(response.data));
     } on DioException catch (e) {
@@ -206,17 +222,34 @@ class TeamService {
   }
 
   /// 팀 프로필 수정
-  Future<Result<TeamProfile>> updateTeamProfile(
-    String teamId, {
+  Future<Result<TeamProfile>> updateTeamProfile({
     String? displayName,
+    String? profileImage,
+    String? bio,
   }) async {
     try {
+      final queryParams = <String, dynamic>{};
+      if (displayName != null) queryParams['displayName'] = displayName;
+      if (profileImage != null) queryParams['profileImage'] = profileImage;
+      if (bio != null) queryParams['bio'] = bio;
+
       final response = await _apiClient.put(
-        ApiEndpoints.teamProfile(teamId),
-        data: {
-          if (displayName != null) 'displayName': displayName,
-        },
+        ApiEndpoints.teamProfile,
+        queryParameters: queryParams,
       );
+      return Success(TeamProfile.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 다른 사용자의 팀 프로필 조회
+  Future<Result<TeamProfile>> getTeamProfileByUserId(String userId) async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.teamProfileByUserId(userId));
       return Success(TeamProfile.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??

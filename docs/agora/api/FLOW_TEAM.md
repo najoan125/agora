@@ -77,20 +77,27 @@ Authorization: Bearer {access_token}
 
 ---
 
-## 단계 4: 팀 프로필 설정
+## 단계 4: 팀 프로필 설정 (선택)
 
-각 멤버가 팀 내에서 사용할 프로필을 설정합니다.
+팀 활동을 위해서는 팀 프로필이 필요합니다.
+팀 프로필은 사용자당 1개만 생성 가능하며, 모든 팀에서 동일하게 사용됩니다.
+
+> **참고**: 팀 프로필이 없으면 팀 채팅에서 "Unknown"으로 표시됩니다.
 
 ```http
-POST /api/agora/teams/1/profile
+POST /api/agora/team-profile
 Authorization: Bearer {access_token}
 Content-Type: application/json
 
 {
-  "displayName": "John (Team Lead)",
+  "displayName": "John (Team)",
   "profileImage": "https://..."
 }
 ```
+
+### 프로필 구조
+- **개인 프로필**: 친구 채팅에서 사용 (`/api/agora/profile`)
+- **팀 프로필**: 팀 채팅/활동에서 사용 (`/api/agora/team-profile`)
 
 ---
 

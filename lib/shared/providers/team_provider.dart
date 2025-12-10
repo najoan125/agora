@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/team_service.dart';
 import '../../data/models/team/team.dart';
-import '../../core/exception/app_exception.dart';
 
 /// Team 서비스 Provider
 final teamServiceProvider = Provider<TeamService>((ref) {
@@ -79,21 +78,33 @@ final teamEventsProvider =
   );
 });
 
-/// 내 팀 프로필 Provider
+/// 내 팀 프로필 Provider (사용자당 하나의 팀 프로필)
 final myTeamProfileProvider =
-    FutureProvider.autoDispose.family<TeamProfile?, int>((ref, teamId) async {
+    FutureProvider.autoDispose<TeamProfile?>((ref) async {
   final service = ref.watch(teamServiceProvider);
-  final result = await service.getMyTeamProfile(teamId.toString());
+  final result = await service.getMyTeamProfile();
 
   return result.when(
     success: (profile) => profile,
     failure: (error) {
-      // 팀 프로필이 없는 경우 null 반환
-      if (error is AppException && error.statusCode == 404) {
+      // 팀 프로필이 없는 경우 null 반환 (400 PROFILE_NOT_FOUND)
+      if (error.statusCode == 400 || error.statusCode == 404) {
         return null;
       }
       throw error;
     },
+  );
+});
+
+/// 팀 프로필 존재 여부 Provider
+final teamProfileExistsProvider =
+    FutureProvider.autoDispose<bool>((ref) async {
+  final service = ref.watch(teamServiceProvider);
+  final result = await service.checkTeamProfileExists();
+
+  return result.when(
+    success: (exists) => exists,
+    failure: (error) => false,
   );
 });
 

@@ -126,23 +126,24 @@ class TeamListResponse {
   Map<String, dynamic> toJson() => _$TeamListResponseToJson(this);
 }
 
-/// 팀 프로필 모델
+/// 팀 프로필 모델 (사용자당 하나의 팀 프로필)
 @JsonSerializable()
 class TeamProfile {
-  final String id;
-  final String teamId;
-  final String userId;
+  final int userId;
+  final String? userEmail;
   final String displayName;
+  @JsonKey(name: 'profileImage')
   final String? profileImageUrl;
+  final String? bio;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   const TeamProfile({
-    required this.id,
-    required this.teamId,
     required this.userId,
+    this.userEmail,
     required this.displayName,
     this.profileImageUrl,
+    this.bio,
     required this.createdAt,
     required this.updatedAt,
   });

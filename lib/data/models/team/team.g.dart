@@ -81,22 +81,22 @@ Map<String, dynamic> _$TeamListResponseToJson(TeamListResponse instance) =>
     };
 
 TeamProfile _$TeamProfileFromJson(Map<String, dynamic> json) => TeamProfile(
-      id: json['id'] as String,
-      teamId: json['teamId'] as String,
-      userId: json['userId'] as String,
+      userId: (json['userId'] as num).toInt(),
+      userEmail: json['userEmail'] as String?,
       displayName: json['displayName'] as String,
-      profileImageUrl: json['profileImageUrl'] as String?,
+      profileImageUrl: json['profileImage'] as String?,
+      bio: json['bio'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
 
 Map<String, dynamic> _$TeamProfileToJson(TeamProfile instance) =>
     <String, dynamic>{
-      'id': instance.id,
-      'teamId': instance.teamId,
       'userId': instance.userId,
+      'userEmail': instance.userEmail,
       'displayName': instance.displayName,
-      'profileImageUrl': instance.profileImageUrl,
+      'profileImage': instance.profileImageUrl,
+      'bio': instance.bio,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };

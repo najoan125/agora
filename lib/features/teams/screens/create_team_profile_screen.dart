@@ -8,14 +8,7 @@ import '../../../data/services/team_service.dart';
 import '../../../data/services/file_service.dart';
 
 class CreateTeamProfileScreen extends ConsumerStatefulWidget {
-  final int teamId;
-  final String teamName;
-
-  const CreateTeamProfileScreen({
-    Key? key,
-    required this.teamId,
-    required this.teamName,
-  }) : super(key: key);
+  const CreateTeamProfileScreen({Key? key}) : super(key: key);
 
   @override
   ConsumerState<CreateTeamProfileScreen> createState() =>
@@ -61,31 +54,29 @@ class _CreateTeamProfileScreenState
       final teamService = TeamService();
       final fileService = FileService();
 
-      // 1. 팀 프로필 생성
-      final profileResult = await teamService.createTeamProfile(
-        widget.teamId.toString(),
-        displayName: _displayNameController.text,
-      );
+      String? uploadedImageUrl;
 
-      profileResult.when(
-        success: (_) {},
-        failure: (_) => throw Exception('팀 프로필 생성에 실패했습니다.'),
-      );
-
-      // 2. 이미지 업로드 (선택한 경우)
+      // 1. 이미지 업로드 (선택한 경우)
       if (_selectedImage != null) {
         final imageResult = await fileService.uploadImage(_selectedImage!);
         imageResult.when(
-          success: (fileResponse) async {
-            // 3. 팀 프로필 이미지 설정
-            await teamService.updateTeamProfile(
-              widget.teamId.toString(),
-              displayName: _displayNameController.text,
-            );
+          success: (fileResponse) {
+            uploadedImageUrl = fileResponse.file.downloadUrl;
           },
           failure: (_) {}, // 이미지 업로드 실패는 무시 (선택사항)
         );
       }
+
+      // 2. 팀 프로필 생성
+      final profileResult = await teamService.createTeamProfile(
+        displayName: _displayNameController.text,
+        profileImage: uploadedImageUrl,
+      );
+
+      profileResult.when(
+        success: (_) {},
+        failure: (error) => throw Exception(error.displayMessage),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +125,7 @@ class _CreateTeamProfileScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 팀 이름 표시
+              // 팀 프로필 설명
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -146,24 +137,24 @@ class _CreateTeamProfileScreenState
                   children: [
                     Icon(Icons.groups, color: AppTheme.primaryColor, size: 24),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '팀',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
                           Text(
-                            widget.teamName,
-                            style: const TextStyle(
+                            '팀 프로필',
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            '팀원들에게 보여질 프로필입니다',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
                         ],
