@@ -212,7 +212,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           final result = await fileService.uploadImage(imageFile);
 
           result.when(
-            success: (fileResponse) => uploadedFileIds.add(fileResponse.file.id),
+            success: (agoraFile) => uploadedFileIds.add(agoraFile.id),
             failure: (error) => throw error,
           );
         }

@@ -7,28 +7,26 @@ part of 'agora_file.dart';
 // **************************************************************************
 
 AgoraFile _$AgoraFileFromJson(Map<String, dynamic> json) => AgoraFile(
-      id: json['id'] as String,
+      id: _idFromJson(json['fileId']),
       originalName: json['originalName'] as String,
-      storedName: json['storedName'] as String,
+      storedName: json['fileName'] as String,
       mimeType: json['mimeType'] as String,
-      size: (json['size'] as num).toInt(),
-      type: $enumDecode(_$FileTypeEnumMap, json['type']),
-      thumbnailUrl: json['thumbnailUrl'] as String?,
-      downloadUrl: json['downloadUrl'] as String,
-      uploaderId: json['uploaderId'] as String,
+      size: (json['fileSize'] as num).toInt(),
+      type: $enumDecode(_$FileTypeEnumMap, json['fileType']),
+      thumbnailUrl: _nullableUrlFromJson(json['thumbnailUrl']),
+      downloadUrl: _urlFromJson(json['fileUrl']),
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
 
 Map<String, dynamic> _$AgoraFileToJson(AgoraFile instance) => <String, dynamic>{
-      'id': instance.id,
+      'fileId': _idToJson(instance.id),
       'originalName': instance.originalName,
-      'storedName': instance.storedName,
+      'fileName': instance.storedName,
       'mimeType': instance.mimeType,
-      'size': instance.size,
-      'type': _$FileTypeEnumMap[instance.type]!,
+      'fileSize': instance.size,
+      'fileType': _$FileTypeEnumMap[instance.type]!,
       'thumbnailUrl': instance.thumbnailUrl,
-      'downloadUrl': instance.downloadUrl,
-      'uploaderId': instance.uploaderId,
+      'fileUrl': instance.downloadUrl,
       'createdAt': instance.createdAt.toIso8601String(),
     };
 

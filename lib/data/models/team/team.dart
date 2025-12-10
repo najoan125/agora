@@ -1,6 +1,18 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 part 'team.g.dart';
+
+// Helper function for nullable URL - adds base URL if needed
+String? _imageUrlFromJson(dynamic value) {
+  if (value == null) return null;
+  final url = value.toString();
+  if (url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return '${ApiEndpoints.baseUrl}$url';
+}
 
 /// 팀 모델
 @JsonSerializable()
@@ -9,7 +21,7 @@ class Team {
   final dynamic id;
   final String name;
   final String? description;
-  @JsonKey(name: 'profileImage')
+  @JsonKey(name: 'profileImage', fromJson: _imageUrlFromJson)
   final String? profileImageUrl;
   @JsonKey(name: 'creatorEmail')
   final String? creatorId;
@@ -65,6 +77,7 @@ class TeamMember {
   final int userId;
   final String agoraId;
   final String? displayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
   final String? profileImage;
   final TeamRole role;
   final DateTime joinedAt;
@@ -127,7 +140,7 @@ class TeamProfile {
   final int userId;
   final String? userEmail;
   final String displayName;
-  @JsonKey(name: 'profileImage')
+  @JsonKey(name: 'profileImage', fromJson: _imageUrlFromJson)
   final String? profileImageUrl;
   final String? bio;
   final DateTime createdAt;
@@ -294,12 +307,15 @@ class TeamInvitation {
   final int invitationId;
   final int teamId;
   final String teamName;
+  @JsonKey(fromJson: _imageUrlFromJson)
   final String? teamProfileImage;
   final String fromAgoraId;
   final String? fromDisplayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
   final String? fromProfileImage;
   final String toAgoraId;
   final String? toDisplayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
   final String? toProfileImage;
   final InvitationStatus status;
   final DateTime createdAt;

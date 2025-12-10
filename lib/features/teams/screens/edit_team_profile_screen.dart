@@ -79,8 +79,8 @@ class _EditTeamProfileScreenState
       if (_imageChanged && _selectedImage != null) {
         final imageResult = await fileService.uploadImage(_selectedImage!);
         imageResult.when(
-          success: (fileResponse) {
-            uploadedImageUrl = fileResponse.file.downloadUrl;
+          success: (agoraFile) {
+            uploadedImageUrl = agoraFile.downloadUrl;
           },
           failure: (_) {}, // 이미지 업로드 실패는 무시 (선택사항)
         );

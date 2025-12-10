@@ -75,7 +75,7 @@ class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
       if (_pickedFile != null) {
         final imageResult = await fileService.uploadImage(File(_pickedFile!.path));
         imageResult.when(
-          success: (fileResponse) => uploadedImageUrl = fileResponse.file.downloadUrl,
+          success: (agoraFile) => uploadedImageUrl = agoraFile.downloadUrl,
           failure: (_) {}, // 이미지 업로드 실패는 무시
         );
       }
