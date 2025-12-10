@@ -25,17 +25,6 @@ class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
   final ImagePicker _picker = ImagePicker();
   XFile? _pickedFile;
   String? _selectedImage; // No default image
-  
-  // Icon selection
-  String _selectedIcon = '🛡️';
-  final List<String> _availableIcons = [
-    '🛡️', '🚀', '💼', '🎓', '⚽', '✈️', '🎵', '🍔', 
-    '💻', '🎨', '🏥', '🏗️', '🎬', '🎮', '📷', '💡',
-    '🔥', '💧', '🌱', '⚡', '⭐', '❤️', '🤝', '📢'
-  ];
-
-  // Mode: true = Image, false = Icon
-  bool _isImageMode = true;
 
   final List<Map<String, dynamic>> _selectedMembers = [];
 
@@ -83,7 +72,7 @@ class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
 
       // 1. 이미지 업로드 (선택한 경우)
       String? uploadedImageUrl;
-      if (_isImageMode && _pickedFile != null) {
+      if (_pickedFile != null) {
         final imageResult = await fileService.uploadImage(File(_pickedFile!.path));
         imageResult.when(
           success: (fileResponse) => uploadedImageUrl = fileResponse.file.downloadUrl,
@@ -155,207 +144,77 @@ class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Type Selection (Image vs Icon)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isImageMode = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isImageMode ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: _isImageMode
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '이미지',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isImageMode = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: !_isImageMode ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: !_isImageMode
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '아이콘',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Selection Area
-            if (_isImageMode) ...[
-              // Image Selection Mode (Center-aligned)
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: _pickedFile != null
-                          ? (kIsWeb
-                              ? Image.network(
-                                  _pickedFile!.path,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                )
-                              : Image.file(
-                                  File(_pickedFile!.path),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                ))
-                          : (_selectedImage != null && _selectedImage!.startsWith('http')
-                              ? Image.network(
-                                  _selectedImage!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                )
-                              : Center(
-                                  child: Icon(Icons.add_photo_alternate,
-                                      size: 40, color: Colors.grey.shade400),
-                                )),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: _pickImage,
-                  child: Text(
-                    _pickedFile != null || (_selectedImage != null && _selectedImage!.startsWith('http'))
-                        ? '이미지 변경'
-                        : '이미지 선택',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.blue.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-
-            ] else ...[
-              // Icon Selection Mode
-              Center(
+            // 팀 이미지 선택
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
                 child: Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    shape: BoxShape.circle,
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: Center(
-                    child: Text(
-                      _selectedIcon,
-                      style: const TextStyle(fontSize: 50),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: _pickedFile != null
+                        ? (kIsWeb
+                            ? Image.network(
+                                _pickedFile!.path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Image.file(
+                                File(_pickedFile!.path),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              ))
+                        : (_selectedImage != null && _selectedImage!.startsWith('http')
+                            ? Image.network(
+                                _selectedImage!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Center(
+                                child: Icon(Icons.add_photo_alternate,
+                                    size: 40, color: Colors.grey.shade400),
+                              )),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 6,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: _pickImage,
+                child: Text(
+                  _pickedFile != null || (_selectedImage != null && _selectedImage!.startsWith('http'))
+                      ? '이미지 변경'
+                      : '이미지 선택',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.blue.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                itemCount: _availableIcons.length,
-                itemBuilder: (context, index) {
-                  final icon = _availableIcons[index];
-                  final isSelected = _selectedIcon == icon;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedIcon = icon),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue.shade100 : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.grey.shade200,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          icon,
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
-            ],
+            ),
 
             const SizedBox(height: 32),
             

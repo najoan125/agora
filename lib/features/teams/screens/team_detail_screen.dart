@@ -316,7 +316,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
   
   void _showTeamRenameDialog() {
-    _teamNameController.text = widget.teamName;
+    _teamNameController.text = widget.team.name;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -566,8 +566,8 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                       image: DecorationImage(
                         image: NetworkImage(
-                          widget.teamImage ??
-                              'https://picsum.photos/seed/$_teamName/200/200',
+                          widget.team.profileImageUrl ??
+                              'https://picsum.photos/seed/${widget.team.name}/200/200',
                         ),
                         fit: BoxFit.cover,
                       ),
@@ -601,8 +601,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
                           MaterialPageRoute(
                             builder: (context) => TeamChatScreen(
                               teamName: _teamName,
-                              teamIcon: widget.teamIcon,
-                              teamImage: widget.teamImage,
+                              teamImage: widget.team.profileImageUrl,
                               members: _members,
                             ),
                           ),

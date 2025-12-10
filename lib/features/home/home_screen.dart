@@ -693,17 +693,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                       return CollapsibleSection(
                         title: '팀 목록',
                         count: filteredTeams.length,
-                        onAdd: () {
-                          Navigator.push(
+                        onAdd: () async {
+                          final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AddTeamScreen(
-                                onTeamAdded: (team) {
-                                  ref.invalidate(teamListProvider);
-                                },
-                              ),
+                              builder: (context) => const AddTeamScreen(),
                             ),
                           );
+                          if (result == true && mounted) {
+                            ref.invalidate(teamListProvider);
+                          }
                         },
                         child: teams.isEmpty
                             ? _buildEmptyTeamState()
