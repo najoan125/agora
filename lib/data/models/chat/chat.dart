@@ -96,13 +96,37 @@ class Chat {
     return null;
   }
 
-  /// 표시할 이름 (우선순위: displayName > name)
+  /// 표시할 이름 (우선순위: otherParticipant > participants > displayName > name)
   String getDisplayName(String myAgoraId) {
+    if (type == ChatType.direct) {
+      if (otherParticipant != null) {
+        return otherParticipant!.displayName;
+      }
+      if (participants != null && participants!.isNotEmpty) {
+        final other = participants!.firstWhere(
+          (p) => p.identifier != myAgoraId,
+          orElse: () => participants!.first,
+        );
+        return other.displayName;
+      }
+    }
     return displayName ?? name ?? '채팅';
   }
 
-  /// 표시할 프로필 이미지 (우선순위: displayImage > profileImageUrl)
+  /// 표시할 프로필 이미지 (우선순위: otherParticipant > participants > displayImage > profileImageUrl)
   String? getDisplayImage(String myAgoraId) {
+    if (type == ChatType.direct) {
+      if (otherParticipant != null) {
+        return otherParticipant!.profileImage;
+      }
+      if (participants != null && participants!.isNotEmpty) {
+        final other = participants!.firstWhere(
+          (p) => p.identifier != myAgoraId,
+          orElse: () => participants!.first,
+        );
+        return other.profileImage;
+      }
+    }
     return displayImage ?? profileImageUrl;
   }
 }

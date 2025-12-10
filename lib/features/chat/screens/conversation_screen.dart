@@ -464,6 +464,14 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     // WebSocket 연결 상태 감지
     final connectionState = ref.watch(webSocketConnectionStateProvider);
 
+    // 내 프로필 이미지 가져오기
+    final myProfile = ref.watch(myProfileProvider);
+    final myProfileImage = myProfile.when(
+      data: (profile) => profile?.profileImageUrl,
+      loading: () => null,
+      error: (_, __) => null,
+    );
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
@@ -546,7 +554,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 height: 12,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              error: (_, __) => const Icon(Icons.circle, color: Colors.red, size: 12),
+              error: (error, stackTrace) {
+                print('WebSocket Connection Error: $error');
+                print('StackTrace: $stackTrace');
+                return const Icon(Icons.circle, color: Colors.red, size: 12);
+              },
             ),
             const SizedBox(width: 8),
           ],
@@ -607,12 +619,16 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey[200],
                                     shape: BoxShape.circle,
-                                    image: const DecorationImage(
-                                      image: NetworkImage(
-                                          'https://picsum.photos/id/1005/200/200'), // My image
-                                      fit: BoxFit.cover,
-                                    ),
+                                    image: myProfileImage != null
+                                        ? DecorationImage(
+                                            image: NetworkImage(myProfileImage),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
                                   ),
+                                  child: myProfileImage == null
+                                      ? const Icon(Icons.person, color: Colors.grey)
+                                      : null,
                                 ),
                                 const SizedBox(height: 8),
                                 const Text(

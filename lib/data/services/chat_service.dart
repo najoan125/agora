@@ -72,6 +72,22 @@ class ChatService {
     }
   }
 
+  /// 채팅방 참여자 조회 (채팅 목록에서 정보가 부족할 때 사용)
+  Future<Result<List<ParticipantProfile>>> getChatParticipants(String chatId) async {
+    try {
+      // API 문서에 명시된 참여자 조회 API가 없으므로, 채팅방 상세 조회를 통해 가져옴
+      // 만약 별도의 /api/agora/chats/{chatId}/participants API가 있다면 그것을 사용해야 함
+      final response = await _apiClient.get(ApiEndpoints.chatById(chatId));
+      final chat = Chat.fromJson(response.data);
+      return Success(chat.participants ?? []);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
   /// 메시지 목록 조회 (커서 페이지네이션)
   Future<Result<MessageListResponse>> getMessages(
     String chatId, {

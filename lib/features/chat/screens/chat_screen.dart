@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../shared/providers/chat_provider.dart';
 import '../../../shared/providers/chat_folder_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 import '../../../data/models/chat/chat.dart';
 import '../widgets/chat_tile.dart';
 import 'conversation_screen.dart';
@@ -87,6 +88,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
       loading: () => 0,
       error: (_, __) => 0,
       data: (chats) => chats.fold(0, (sum, chat) => sum + chat.unreadCount),
+    );
+
+    final myProfile = ref.watch(myProfileProvider);
+    final currentUserId = myProfile.when(
+      data: (profile) => profile?.agoraId ?? '',
+      loading: () => '',
+      error: (_, __) => '',
     );
 
     return Stack(
@@ -464,6 +472,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
 
   Widget _buildChatList({required bool isTeam}) {
     final chatsAsync = ref.watch(chatListProvider);
+    final myProfile = ref.watch(myProfileProvider);
+    final currentUserId = myProfile.when(
+      data: (profile) => profile?.agoraId ?? '',
+      loading: () => '',
+      error: (_, __) => '',
+    );
 
     return chatsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -533,7 +547,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
               final chat = filteredChats[index];
               final isGroupChat = chat.type == ChatType.group;
               return ChatTile(
-                chat: _chatToMap(chat),
+                chat: _chatToMap(chat, currentUserId),
                 onTap: () {
                   if (isGroupChat) {
                     Navigator.push(
@@ -553,8 +567,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                       MaterialPageRoute(
                         builder: (context) => ConversationScreen(
                           chatId: chat.id.toString(),
-                          userName: chat.name ?? '알 수 없음',
-                          userImage: chat.profileImageUrl ?? '',
+                          userName: chat.getDisplayName(currentUserId),
+                          userImage: chat.getDisplayImage(currentUserId) ?? '',
                           isTeam: false,
                         ),
                       ),
@@ -569,12 +583,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
     );
   }
 
-  Map<String, dynamic> _chatToMap(Chat chat) {
-    final name = chat.name ?? '알 수 없음';
+  Map<String, dynamic> _chatToMap(Chat chat, String currentUserId) {
+    final name = chat.getDisplayName(currentUserId);
     return {
       'id': chat.id,
       'name': name,
-      'image': chat.profileImageUrl,
+      'image': chat.getDisplayImage(currentUserId),
       'avatar': name.isNotEmpty ? name[0] : '?',
       'message': chat.lastMessage?.content ?? '',
       'time': _formatTime(chat.lastMessage?.createdAt),

@@ -20,7 +20,17 @@ final webSocketServiceProvider = Provider<WebSocketService>((ref) {
 final webSocketConnectionStateProvider =
     StreamProvider.autoDispose<WebSocketConnectionState>((ref) {
   final service = ref.watch(webSocketServiceProvider);
-  return service.connectionState;
+  // 현재 상태를 먼저 emit하고, 이후 변경사항을 스트림으로 받음
+  return Stream<WebSocketConnectionState>.multi((controller) {
+    // 현재 상태를 즉시 emit
+    controller.add(service.currentState);
+    // 이후 변경사항 구독
+    final subscription = service.connectionState.listen(
+      controller.add,
+      onError: controller.addError,
+    );
+    controller.onCancel = subscription.cancel;
+  });
 });
 
 /// 채팅방 목록 Provider
@@ -29,7 +39,20 @@ final chatListProvider = FutureProvider.autoDispose<List<Chat>>((ref) async {
   final result = await service.getChats();
 
   return result.when(
-    success: (chats) => chats,
+    success: (chats) async {
+      // 1:1 채팅방 중 참여자 정보가 없는 경우 상세 정보를 조회하여 채워넣음
+      final updatedChats = await Future.wait(chats.map((chat) async {
+        if (chat.type == ChatType.direct && (chat.participants == null || chat.participants!.isEmpty)) {
+          final detailResult = await service.getChatById(chat.id.toString());
+          return detailResult.when(
+            success: (detailChat) => detailChat,
+            failure: (_) => chat,
+          );
+        }
+        return chat;
+      }));
+      return updatedChats;
+    },
     failure: (error) => throw error,
   );
 });
@@ -175,7 +198,13 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
 
   /// 읽음 처리
   void markAsRead() {
-    _webSocketService.markAsRead(chatId);
+    // 최신 메시지 ID 가져오기
+    final latestMessageId = state.messages.isNotEmpty
+        ? (state.messages.first.id is int
+            ? state.messages.first.id as int
+            : int.tryParse(state.messages.first.id.toString()))
+        : null;
+    _webSocketService.markAsRead(chatId, messageId: latestMessageId);
   }
 
   @override

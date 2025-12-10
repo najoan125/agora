@@ -139,7 +139,7 @@ class ApiEndpoints {
       '/api/agora/settings/birthday-reminder';
 
   // ============ WebSocket ============
-  static const String wsChat = 'wss://api.hyfata.kr/ws/agora/chat';
+  static const String wsChat = 'wss://api.hyfata.kr:443/ws/agora/chat/websocket';
   static String wsChatTopic(String chatId) => '/topic/agora/chat/$chatId';
   static String wsChatSend(String chatId) => '/app/agora/chat/$chatId/send';
   static String wsChatRead(String chatId) => '/app/agora/chat/$chatId/read';

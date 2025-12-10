@@ -103,9 +103,6 @@ class WebSocketService {
           stompConnectHeaders: {
             'Authorization': 'Bearer $token',
           },
-          webSocketConnectHeaders: {
-            'Authorization': 'Bearer $token',
-          },
           onConnect: _onConnect,
           onDisconnect: _onDisconnect,
           onStompError: _onStompError,
@@ -117,7 +114,9 @@ class WebSocketService {
       );
 
       _client!.activate();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('WebSocket Connection Exception: $e');
+      print('StackTrace: $stackTrace');
       _updateState(WebSocketConnectionState.error);
       _scheduleReconnect();
     }
@@ -191,14 +190,21 @@ class WebSocketService {
   }
 
   /// 읽음 처리
-  void markAsRead(String chatId) {
+  void markAsRead(String chatId, {int? messageId}) {
     if (_client == null || _currentState != WebSocketConnectionState.connected) {
+      return;
+    }
+
+    // messageId가 없으면 요청하지 않음 (서버에서 빈 payload 거부)
+    if (messageId == null) {
       return;
     }
 
     _client!.send(
       destination: ApiEndpoints.wsChatRead(chatId),
-      body: '',
+      body: jsonEncode({
+        'messageId': messageId,
+      }),
     );
   }
 
@@ -230,6 +236,7 @@ class WebSocketService {
   }
 
   void _onStompError(StompFrame frame) {
+    print('STOMP Error: ${frame.body}');
     _eventController.add(WebSocketEvent(
       type: WebSocketEventType.error,
       chatId: '',
@@ -241,6 +248,7 @@ class WebSocketService {
   }
 
   void _onWebSocketError(dynamic error) {
+    print('WebSocket Error: $error');
     _updateState(WebSocketConnectionState.error);
     _scheduleReconnect();
   }
