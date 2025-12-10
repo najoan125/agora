@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../data/data_manager.dart';
+import '../../../data/models/agora_profile_response.dart';
 import '../../chat/screens/conversation_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../settings/screens/more_screen.dart';
 import '../../../shared/providers/chat_provider.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> user;
@@ -31,6 +33,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _isCurrentUser = widget.user['name'] == _dataManager.currentUser['name'];
     _isFavorite = widget.user['isFavorite'] ?? false;
   }
+
+  String? get _agoraId => widget.user['agoraId']?.toString();
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +267,69 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildInfoSection() {
+    // agoraId가 있으면 API에서 상세 프로필 가져오기
+    if (_agoraId != null && _agoraId!.isNotEmpty && !_isCurrentUser) {
+      final profileAsync = ref.watch(userProfileProvider(_agoraId!));
+
+      return profileAsync.when(
+        loading: () => _buildInfoContainer(
+          children: [
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ],
+        ),
+        error: (_, __) => _buildInfoContainer(
+          children: [
+            _buildInfoRow(Icons.badge_outlined, '@$_agoraId'),
+          ],
+        ),
+        data: (profile) {
+          if (profile == null) {
+            return _buildInfoContainer(
+              children: [
+                _buildInfoRow(Icons.badge_outlined, '@$_agoraId'),
+              ],
+            );
+          }
+          return _buildProfileInfo(profile);
+        },
+      );
+    }
+
+    // 본인 프로필이거나 agoraId가 없는 경우 기본 표시
+    return _buildInfoContainer(
+      children: [
+        _buildInfoRow(Icons.badge_outlined, '@${_agoraId ?? '-'}'),
+      ],
+    );
+  }
+
+  Widget _buildProfileInfo(AgoraProfileResponse profile) {
+    return _buildInfoContainer(
+      children: [
+        // agoraId
+        _buildInfoRow(Icons.badge_outlined, '@${profile.agoraId}'),
+
+        // 전화번호 (있는 경우에만 표시)
+        if (profile.phone != null && profile.phone!.isNotEmpty) ...[
+          const Divider(height: 24),
+          _buildInfoRow(Icons.phone_outlined, profile.phone!),
+        ],
+
+        // 생년월일 (있는 경우에만 표시)
+        if (profile.birthday != null && profile.birthday!.isNotEmpty) ...[
+          const Divider(height: 24),
+          _buildInfoRow(Icons.cake_outlined, _formatBirthday(profile.birthday!)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInfoContainer({required List<Widget> children}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
@@ -277,20 +344,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          _buildInfoRow(Icons.phone_outlined, widget.user['phone'] ?? '010-0000-0000'),
-          const Divider(height: 24),
-          _buildInfoRow(Icons.email_outlined, widget.user['email'] ?? 'user@example.com'),
-          const Divider(height: 24),
-          _buildInfoRow(Icons.badge_outlined, widget.user['id']?.toString() ?? '@seona_123'),
-          if (!_isCurrentUser) ...[
-             const Divider(height: 24),
-             _buildInfoRow(Icons.cake_outlined, widget.user['birthdate'] ?? '1월 1일'),
-          ]
-        ],
-      ),
+      child: Column(children: children),
     );
+  }
+
+  String _formatBirthday(String birthday) {
+    // birthday 형식: "1990-01-15" → "1월 15일"
+    try {
+      final parts = birthday.split('-');
+      if (parts.length >= 3) {
+        final month = int.parse(parts[1]);
+        final day = int.parse(parts[2]);
+        return '$month월 $day일';
+      }
+    } catch (_) {}
+    return birthday;
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
