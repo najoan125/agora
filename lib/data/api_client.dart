@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import '../core/utils/secure_storage_manager.dart';
 import '../core/constants/api_endpoints.dart';
@@ -8,6 +10,7 @@ import '../core/exception/app_exception.dart';
 class ApiClient {
   late Dio dio;
   late Dio _refreshDio; // 토큰 갱신 전용 (인터셉터 없음)
+  Completer<bool>? _refreshCompleter; // 토큰 갱신 동시성 제어
 
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -64,8 +67,33 @@ class ApiClient {
     await SecureStorageManager.clearSession();
   }
 
-  /// 토큰 갱신
+  /// 토큰 갱신 (동시성 제어 포함)
   Future<bool> refreshToken() async {
+    // 이미 갱신 중이면 기존 작업 완료 대기
+    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+      print('Token refresh already in progress, waiting...');
+      return await _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<bool>();
+
+    try {
+      final result = await _performTokenRefresh();
+      _refreshCompleter!.complete(result);
+      return result;
+    } catch (e) {
+      _refreshCompleter!.complete(false);
+      return false;
+    } finally {
+      // 다음 갱신 사이클을 위해 약간의 딜레이 후 리셋
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _refreshCompleter = null;
+      });
+    }
+  }
+
+  /// 실제 토큰 갱신 로직
+  Future<bool> _performTokenRefresh() async {
     try {
       final refreshToken = await SecureStorageManager.getRefreshToken();
       if (refreshToken == null) {
