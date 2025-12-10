@@ -126,7 +126,7 @@ Map<String, dynamic> _$ChatListResponseToJson(ChatListResponse instance) =>
 
 ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
       id: json['messageId'],
-      chatId: json['chatId'] as String?,
+      chatId: ChatMessage._chatIdFromJson(json['chatId']),
       senderId: (json['senderId'] as num?)?.toInt(),
       senderAgoraId: json['senderAgoraId'] as String,
       senderName: json['senderName'] as String?,

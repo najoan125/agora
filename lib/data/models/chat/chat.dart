@@ -192,7 +192,13 @@ class ChatListResponse {
 class ChatMessage {
   @JsonKey(name: 'messageId')
   final dynamic id;
+  @JsonKey(fromJson: _chatIdFromJson)
   final String? chatId;
+
+  static String? _chatIdFromJson(dynamic value) {
+    if (value == null) return null;
+    return value.toString();
+  }
   @JsonKey(name: 'senderId')
   final int? senderId;
   final String senderAgoraId;
