@@ -36,7 +36,7 @@ TeamMember _$TeamMemberFromJson(Map<String, dynamic> json) => TeamMember(
       agoraId: json['agoraId'] as String,
       displayName: json['displayName'] as String?,
       profileImage: _imageUrlFromJson(json['profileImage']),
-      role: $enumDecode(_$TeamRoleEnumMap, json['role']),
+      role: $enumDecode(_$TeamRoleEnumMap, json['roleName']),
       joinedAt: DateTime.parse(json['joinedAt'] as String),
     );
 
@@ -47,13 +47,13 @@ Map<String, dynamic> _$TeamMemberToJson(TeamMember instance) =>
       'agoraId': instance.agoraId,
       'displayName': instance.displayName,
       'profileImage': instance.profileImage,
-      'role': _$TeamRoleEnumMap[instance.role]!,
+      'roleName': _$TeamRoleEnumMap[instance.role]!,
       'joinedAt': instance.joinedAt.toIso8601String(),
     };
 
 const _$TeamRoleEnumMap = {
-  TeamRole.admin: 'ADMIN',
-  TeamRole.member: 'MEMBER',
+  TeamRole.admin: 'admin',
+  TeamRole.member: 'member',
 };
 
 TeamListResponse _$TeamListResponseFromJson(Map<String, dynamic> json) =>

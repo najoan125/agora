@@ -11,6 +11,7 @@ import 'notice_list_screen.dart';
 import '../../../data/data_manager.dart';
 import '../../../data/models/team/team.dart';
 import '../../../data/services/team_service.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 
 class TeamDetailScreen extends ConsumerStatefulWidget {
   final Team team;
@@ -108,13 +109,31 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
       }
     }
     
-    // Check permissions for current user
-    final currentUser = DataManager().currentUser['name'];
-    _canCreateNotice = DataManager().checkPermission(_teamName, currentUser, 'notice');
-    _canAddMember = DataManager().checkPermission(_teamName, currentUser, 'add_member');
-    _canManageRoles = DataManager().checkPermission(_teamName, currentUser, 'manage_roles');
-    
+    // Check permissions for current user based on API role
+    _checkPermissions();
+
     setState(() {});
+  }
+
+  void _checkPermissions() {
+    // Get current user's agoraId from profile
+    final profileAsync = ref.read(myProfileProvider);
+    final profile = profileAsync.valueOrNull;
+
+    if (profile != null && _apiMembers.isNotEmpty) {
+      // Find current user in team members
+      final currentMember = _apiMembers.where(
+        (m) => m.agoraId == profile.agoraId,
+      ).firstOrNull;
+
+      if (currentMember != null) {
+        // Admin has all permissions
+        final isAdmin = currentMember.role == TeamRole.admin;
+        _canCreateNotice = isAdmin;
+        _canAddMember = isAdmin;
+        _canManageRoles = isAdmin;
+      }
+    }
   }
 
   @override
@@ -479,6 +498,31 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch profile and update permissions when loaded
+    final profileAsync = ref.watch(myProfileProvider);
+    profileAsync.whenData((profile) {
+      if (profile != null && _apiMembers.isNotEmpty) {
+        final currentMember = _apiMembers.where(
+          (m) => m.agoraId == profile.agoraId,
+        ).firstOrNull;
+
+        if (currentMember != null) {
+          final isAdmin = currentMember.role == TeamRole.admin;
+          if (_canCreateNotice != isAdmin || _canAddMember != isAdmin || _canManageRoles != isAdmin) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _canCreateNotice = isAdmin;
+                  _canAddMember = isAdmin;
+                  _canManageRoles = isAdmin;
+                });
+              }
+            });
+          }
+        }
+      }
+    });
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(

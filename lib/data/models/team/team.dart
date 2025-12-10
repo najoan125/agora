@@ -79,6 +79,7 @@ class TeamMember {
   final String? displayName;
   @JsonKey(fromJson: _imageUrlFromJson)
   final String? profileImage;
+  @JsonKey(name: 'roleName')
   final TeamRole role;
   final DateTime joinedAt;
 
@@ -104,9 +105,9 @@ class TeamMember {
 
 /// 팀 역할
 enum TeamRole {
-  @JsonValue('ADMIN')
+  @JsonValue('admin')
   admin,
-  @JsonValue('MEMBER')
+  @JsonValue('member')
   member,
 }
 
