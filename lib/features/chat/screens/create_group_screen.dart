@@ -86,7 +86,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         
         uploadResult.when(
           success: (response) {
-            fileId = response.file.id;
+            fileId = response.id;
           },
           failure: (error) {
             ScaffoldMessenger.of(context).showSnackBar(
