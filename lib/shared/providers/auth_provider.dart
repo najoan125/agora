@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/secure_storage_manager.dart';
 import '../../core/exception/app_exception.dart';
 import '../../services/oauth_service.dart';
+import '../../services/websocket_service.dart';
+import 'chat_provider.dart' show webSocketServiceProvider;
 
 /// 인증 상태
 enum AuthStatus {
@@ -104,8 +106,9 @@ class AuthState {
 /// 인증 상태 관리 Notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final OAuthService _oauthService;
+  final WebSocketService _webSocketService;
 
-  AuthNotifier(this._oauthService) : super(AuthState.initial()) {
+  AuthNotifier(this._oauthService, this._webSocketService) : super(AuthState.initial()) {
     _initialize();
   }
 
@@ -134,6 +137,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
             agoraId: agoraId,
             expiresAt: expiresAt,
           );
+
+          // 인증 성공 시 WebSocket 연결
+          _webSocketService.connect();
         } else {
           // 토큰 만료됨 - 로그아웃 처리
           await SecureStorageManager.clearSession();
@@ -161,6 +167,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         agoraId: result.agoraId,
         expiresAt: result.expiresAt,
       );
+
+      // 로그인 성공 시 WebSocket 연결 (재연결)
+      _webSocketService.disconnect();
+      _webSocketService.connect();
     } on AppException catch (e) {
       state = AuthState.error(e.displayMessage);
     } catch (e) {
@@ -171,6 +181,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 로그아웃
   Future<void> logout() async {
     try {
+      // 로그아웃 시 WebSocket 연결 해제
+      _webSocketService.disconnect();
       await _oauthService.logout();
     } finally {
       state = AuthState.unauthenticated();
@@ -179,6 +191,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 강제 로그아웃 (토큰 만료 등)
   Future<void> forceLogout() async {
+    // WebSocket 연결 해제
+    _webSocketService.disconnect();
     await SecureStorageManager.clearSession();
     state = AuthState.unauthenticated();
   }
@@ -216,7 +230,8 @@ final oauthServiceProvider = Provider<OAuthService>((ref) {
 /// 인증 상태 Provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final oauthService = ref.watch(oauthServiceProvider);
-  return AuthNotifier(oauthService);
+  final webSocketService = ref.watch(webSocketServiceProvider);
+  return AuthNotifier(oauthService, webSocketService);
 });
 
 /// 인증 여부 Provider (편의용)

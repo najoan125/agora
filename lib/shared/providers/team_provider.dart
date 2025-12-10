@@ -226,3 +226,100 @@ final teamActionProvider =
   final service = ref.watch(teamServiceProvider);
   return TeamActionNotifier(service, ref);
 });
+
+// ============ Team Invitations ============
+
+/// 받은 팀 초대 목록 Provider
+final teamInvitationsProvider =
+    FutureProvider.autoDispose<List<TeamInvitation>>((ref) async {
+  final service = ref.watch(teamServiceProvider);
+  final result = await service.getReceivedInvitations();
+
+  return result.when(
+    success: (invitations) =>
+        invitations.where((inv) => inv.isPending).toList(),
+    failure: (error) => throw error,
+  );
+});
+
+/// 팀 초대 작업 상태
+class TeamInvitationActionState {
+  final bool isLoading;
+  final String? error;
+  final String? successMessage;
+
+  const TeamInvitationActionState({
+    this.isLoading = false,
+    this.error,
+    this.successMessage,
+  });
+}
+
+/// 팀 초대 작업 Notifier
+class TeamInvitationActionNotifier
+    extends StateNotifier<TeamInvitationActionState> {
+  final TeamService _service;
+  final Ref _ref;
+
+  TeamInvitationActionNotifier(this._service, this._ref)
+      : super(const TeamInvitationActionState());
+
+  /// 팀 초대 수락
+  Future<bool> acceptInvitation(String invitationId) async {
+    state = const TeamInvitationActionState(isLoading: true);
+
+    final result = await _service.acceptInvitation(invitationId);
+
+    return result.when(
+      success: (invitation) {
+        state = TeamInvitationActionState(
+          successMessage: '${invitation.teamName} 팀에 가입했습니다.',
+        );
+        _ref.invalidate(teamInvitationsProvider);
+        _ref.invalidate(teamListProvider);
+        return true;
+      },
+      failure: (error) {
+        state = TeamInvitationActionState(error: error.displayMessage);
+        return false;
+      },
+    );
+  }
+
+  /// 팀 초대 거절
+  Future<bool> rejectInvitation(String invitationId) async {
+    state = const TeamInvitationActionState(isLoading: true);
+
+    final result = await _service.rejectInvitation(invitationId);
+
+    return result.when(
+      success: (_) {
+        state = const TeamInvitationActionState(
+          successMessage: '초대를 거절했습니다.',
+        );
+        _ref.invalidate(teamInvitationsProvider);
+        return true;
+      },
+      failure: (error) {
+        state = TeamInvitationActionState(error: error.displayMessage);
+        return false;
+      },
+    );
+  }
+
+  void clearError() {
+    state = const TeamInvitationActionState();
+  }
+
+  void clearSuccessMessage() {
+    state = const TeamInvitationActionState();
+  }
+}
+
+/// 팀 초대 작업 Provider
+final teamInvitationActionProvider =
+    StateNotifierProvider<TeamInvitationActionNotifier, TeamInvitationActionState>(
+        (ref) {
+  final service = ref.watch(teamServiceProvider);
+  return TeamInvitationActionNotifier(service, ref);
+});

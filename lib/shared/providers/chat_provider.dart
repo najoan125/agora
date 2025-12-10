@@ -194,11 +194,7 @@ final chatListProvider =
         (ref) {
   final chatService = ref.watch(chatServiceProvider);
   final webSocketService = ref.watch(webSocketServiceProvider);
-  final notifier = ChatListNotifier(chatService, webSocketService, ref);
-  
-  ref.onDispose(() => notifier.dispose());
-  
-  return notifier;
+  return ChatListNotifier(chatService, webSocketService, ref);
 });
 
 
@@ -571,17 +567,20 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
 
   /// 1:1 채팅 시작
   Future<Chat?> startDirectChat(String targetAgoraId) async {
+    if (!mounted) return null;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.getOrCreateDirectChat(targetAgoraId);
 
     return result.when(
       success: (chat) {
+        if (!mounted) return chat;
         state = const ChatActionState();
         _ref.read(chatListProvider.notifier).invalidate();
         return chat;
       },
       failure: (error) {
+        if (!mounted) return null;
         state = ChatActionState(error: error.displayMessage);
         return null;
       },
@@ -590,16 +589,19 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
 
   /// 메시지 삭제
   Future<bool> deleteMessage(String chatId, String messageId) async {
+    if (!mounted) return false;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.deleteMessage(chatId, messageId);
 
     return result.when(
       success: (_) {
+        if (!mounted) return true;
         state = const ChatActionState();
         return true;
       },
       failure: (error) {
+        if (!mounted) return false;
         state = ChatActionState(error: error.displayMessage);
         return false;
       },
@@ -607,6 +609,7 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
   }
 
   void clearError() {
+    if (!mounted) return;
     state = const ChatActionState();
   }
 
@@ -623,6 +626,7 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
     required List<int> memberIds,
     String? fileId,
   }) async {
+    if (!mounted) return null;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.createGroupChat(
@@ -649,18 +653,21 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
 
   /// 그룹 채팅방 멤버 초대
   Future<bool> inviteToGroupChat(String chatId, List<int> memberIds) async {
+    if (!mounted) return false;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.inviteToGroupChat(chatId, memberIds);
 
     return result.when(
       success: (_) {
+        if (!mounted) return true;
         state = const ChatActionState();
         // 채팅 목록 새로고침 (참여자 수 변경 등 반영)
         _ref.read(chatListProvider.notifier).invalidate();
         return true;
       },
       failure: (error) {
+        if (!mounted) return false;
         state = ChatActionState(error: error.displayMessage);
         return false;
       },
@@ -669,18 +676,21 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
 
   /// 그룹 채팅방 나가기
   Future<bool> leaveGroupChat(String chatId) async {
+    if (!mounted) return false;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.leaveGroupChat(chatId);
 
     return result.when(
       success: (_) {
+        if (!mounted) return true;
         state = const ChatActionState();
         // 채팅 목록 새로고침 (목록에서 제거)
         _ref.read(chatListProvider.notifier).invalidate();
         return true;
       },
       failure: (error) {
+        if (!mounted) return false;
         state = ChatActionState(error: error.displayMessage);
         return false;
       },
@@ -689,16 +699,19 @@ class ChatActionNotifier extends StateNotifier<ChatActionState> {
 
   /// 그룹 채팅방 멤버 강퇴 (방장 전용)
   Future<bool> removeMemberFromGroupChat(String chatId, String userId) async {
+    if (!mounted) return false;
     state = const ChatActionState(isLoading: true);
 
     final result = await _service.removeMemberFromGroupChat(chatId, userId);
 
     return result.when(
       success: (_) {
+        if (!mounted) return true;
         state = const ChatActionState();
         return true;
       },
       failure: (error) {
+        if (!mounted) return false;
         state = ChatActionState(error: error.displayMessage);
         return false;
       },

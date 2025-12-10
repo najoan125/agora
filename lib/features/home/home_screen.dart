@@ -15,6 +15,7 @@ import '../friends/screens/add_friend_screen.dart';
 import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
 import '../teams/screens/create_team_profile_screen.dart';
+import '../teams/widgets/team_invitation_tile.dart';
 import '../../data/models/chat/chat.dart';
 import '../chat/widgets/chat_tile.dart';
 import '../../shared/providers/chat_provider.dart';
@@ -715,6 +716,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildTeamList() {
     final teamsAsync = ref.watch(teamListProvider);
     final teamProfileAsync = ref.watch(myTeamProfileProvider);
+    final invitationsAsync = ref.watch(teamInvitationsProvider);
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -722,6 +724,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         onRefresh: () async {
           ref.invalidate(teamListProvider);
           ref.invalidate(myTeamProfileProvider);
+          ref.invalidate(teamInvitationsProvider);
         },
         child: CustomScrollView(
           slivers: [
@@ -745,7 +748,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             SliverList(
               delegate: SliverChildListDelegate(
                 [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
+
+                  // Team Invitations Section
+                  invitationsAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (invitations) {
+                      if (invitations.isEmpty) return const SizedBox.shrink();
+                      return CollapsibleSection(
+                        title: '팀 초대',
+                        count: invitations.length,
+                        child: Column(
+                          children: invitations.map((invitation) {
+                            return TeamInvitationTile(
+                              invitation: invitation,
+                              onAccept: () async {
+                                final notifier = ref.read(
+                                    teamInvitationActionProvider.notifier);
+                                final success = await notifier.acceptInvitation(
+                                    invitation.invitationId.toString());
+                                if (success && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          '${invitation.teamName} 팀에 가입했습니다'),
+                                    ),
+                                  );
+                                }
+                              },
+                              onDecline: () async {
+                                final notifier = ref.read(
+                                    teamInvitationActionProvider.notifier);
+                                final success = await notifier.rejectInvitation(
+                                    invitation.invitationId.toString());
+                                if (success && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          '${invitation.teamName} 팀의 초대를 거절했습니다'),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
                   teamsAsync.when(
                     loading: () => const Center(
                       child: Padding(
