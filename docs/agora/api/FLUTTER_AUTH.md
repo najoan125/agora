@@ -461,7 +461,7 @@ final accessTokenProvider = FutureProvider((ref) async {
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:app_links/app_links.dart';
+import 'package:uni_links/uni_links.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:agora_app/presentation/providers/auth_provider.dart';
 
@@ -471,8 +471,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final AppLinks _appLinks = AppLinks();
-  StreamSubscription<Uri>? _deepLinkSubscription;
+  StreamSubscription? _deepLinkSubscription;
   String? _codeVerifier;
   bool _isLoading = false;
 
@@ -490,9 +489,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Deep Link 리스너 설정
   void _initializeDeepLinkListener() {
-    _deepLinkSubscription = _appLinks.uriLinkStream.listen(
-      (Uri uri) {
-        _handleDeepLink(uri.toString());
+    _deepLinkSubscription = uriLinkStream.listen(
+      (String? link) {
+        if (link != null) {
+          _handleDeepLink(link);
+        }
       },
       onError: (err) {
         print('Deep link error: $err');

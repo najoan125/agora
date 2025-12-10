@@ -56,7 +56,7 @@ class FileService {
   /// 이미지 업로드 (썸네일 자동 생성)
   /// [imageFile] 업로드할 이미지 파일
   /// [onSendProgress] 업로드 진행률 콜백
-  Future<Result<FileUploadResponse>> uploadImage(
+  Future<Result<AgoraFile>> uploadImage(
     File imageFile, {
     void Function(int sent, int total)? onSendProgress,
   }) async {
@@ -86,7 +86,7 @@ class FileService {
         onSendProgress: onSendProgress,
       );
 
-      return Success(FileUploadResponse.fromJson(response.data));
+      return Success(AgoraFile.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
@@ -196,11 +196,11 @@ class FileService {
   /// 여러 이미지 동시 업로드
   /// [images] 업로드할 이미지 파일 리스트
   /// [onProgress] 전체 진행률 콜백 (현재 파일 인덱스, 총 파일 개수)
-  Future<Result<List<FileUploadResponse>>> uploadMultipleImages(
+  Future<Result<List<AgoraFile>>> uploadMultipleImages(
     List<File> images, {
     void Function(int current, int total)? onProgress,
   }) async {
-    final results = <FileUploadResponse>[];
+    final results = <AgoraFile>[];
 
     for (int i = 0; i < images.length; i++) {
       onProgress?.call(i + 1, images.length);

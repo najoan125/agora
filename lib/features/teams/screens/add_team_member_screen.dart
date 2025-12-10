@@ -20,6 +20,7 @@ class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
   late TextEditingController _searchController;
   String _searchQuery = '';
   bool _isSearching = false;
+  bool _hasSearched = false;
   List<AgoraProfileResponse> _searchResults = [];
   final Set<AgoraProfileResponse> _selectedMembers = {};
   String _selectedCountryCode = '+82';
@@ -48,22 +49,35 @@ class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
   }
 
   void _searchMember() async {
-    if (_searchQuery.isEmpty) {
+    final query = _searchQuery.trim();
+
+    if (query.isEmpty) {
       setState(() {
         _searchResults = [];
       });
       return;
     }
 
+    // API는 최소 2글자를 요구함
+    if (query.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('2글자 이상 입력해주세요')),
+      );
+      return;
+    }
+
     setState(() {
       _isSearching = true;
+      _hasSearched = true;
       _searchResults = [];
     });
 
     try {
       // ProfileService를 통해 사용자 검색
       final profileService = ref.read(profileServiceProvider);
-      final results = await profileService.searchUsers(keyword: _searchQuery);
+      print('🔍 [AddTeamMember] Searching for: $query');
+      final results = await profileService.searchUsers(keyword: query);
+      print('📥 [AddTeamMember] Search results: ${results.length} users found');
 
       if (mounted) {
         setState(() {
@@ -72,7 +86,7 @@ class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
         });
       }
     } catch (e) {
-      print('❌ Error searching users: $e');
+      print('❌ [AddTeamMember] Error searching users: $e');
       if (mounted) {
         setState(() {
           _isSearching = false;
@@ -365,6 +379,7 @@ class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
                               setState(() {
                                 _searchQuery = '';
                                 _searchResults = [];
+                                _hasSearched = false;
                               });
                             },
                             child: const Icon(Icons.close,
@@ -486,6 +501,38 @@ class _AddTeamMemberScreenState extends ConsumerState<AddTeamMemberScreen>
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 검색을 실행하지 않았으면 안내 메시지 표시
+    if (!_hasSearched) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 60,
+              color: Colors.grey.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '검색 버튼을 눌러주세요',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '2글자 이상 입력 후 검색하세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade400,
               ),
             ),
           ],

@@ -1,39 +1,40 @@
 // 팀 상세 정보 및 관리 화면
 import 'package:flutter/material.dart';
-import '../../chat/screens/team_chat_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../chat/screens/conversation_screen.dart';
 import 'add_team_member_screen.dart';
 import 'add_position_screen.dart';
-import 'org_chart_screen.dart';
 import 'create_notice_screen.dart';
 import 'notice_list_screen.dart';
+import 'edit_team_screen.dart';
 import '../../../data/data_manager.dart';
+import '../../../data/models/team/team.dart';
+import '../../../data/services/team_service.dart';
+import '../../../shared/providers/riverpod_profile_provider.dart';
 
-class TeamDetailScreen extends StatefulWidget {
-  final String teamName;
-  final String teamIcon;
-  final List<String> members;
-  final String? teamImage;
+class TeamDetailScreen extends ConsumerStatefulWidget {
+  final Team team;
 
   const TeamDetailScreen({
     Key? key,
-    required this.teamName,
-    required this.teamIcon,
-    required this.members,
-    this.teamImage,
+    required this.team,
   }) : super(key: key);
 
   @override
-  State<TeamDetailScreen> createState() => _TeamDetailScreenState();
+  ConsumerState<TeamDetailScreen> createState() => _TeamDetailScreenState();
 }
 
-class _TeamDetailScreenState extends State<TeamDetailScreen> {
+class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
+  List<TeamMember> _apiMembers = [];
+  bool _isLoadingMembers = true;
+  bool _isLoadingChat = false;
   late List<String> _members;
   Map<String, List<String>> _membersByRole = {};
   List<Map<String, dynamic>> _roleDefinitions = [];
   late TextEditingController _teamNameController;
   late String _teamName;
-  
+  late Team _currentTeam;
+
   // Permissions
   bool _canCreateNotice = false;
   bool _canAddMember = false;
@@ -42,10 +43,38 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _members = List<String>.from(widget.members);
-    _teamName = widget.teamName;
-    _teamNameController = TextEditingController(text: widget.teamName);
+    _members = []; // Initialize with empty list, will be loaded from API
+    _currentTeam = widget.team;
+    _teamName = widget.team.name;
+    _teamNameController = TextEditingController(text: widget.team.name);
+    _loadTeamMembers();
     _refreshRoles();
+  }
+
+  Future<void> _loadTeamMembers() async {
+    final teamService = TeamService();
+    final result = await teamService.getTeamMembers(widget.team.id.toString());
+
+    result.when(
+      success: (members) {
+        if (mounted) {
+          setState(() {
+            _apiMembers = members;
+            _members = members.map((m) => m.effectiveDisplayName).toList();
+            _isLoadingMembers = false;
+            _refreshRoles();
+          });
+        }
+      },
+      failure: (error) {
+        if (mounted) {
+          setState(() => _isLoadingMembers = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('팀원 목록 로드 실패: ${error.displayMessage}')),
+          );
+        }
+      },
+    );
   }
 
   void _refreshRoles() {
@@ -82,13 +111,31 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       }
     }
     
-    // Check permissions for current user
-    final currentUser = DataManager().currentUser['name'];
-    _canCreateNotice = DataManager().checkPermission(_teamName, currentUser, 'notice');
-    _canAddMember = DataManager().checkPermission(_teamName, currentUser, 'add_member');
-    _canManageRoles = DataManager().checkPermission(_teamName, currentUser, 'manage_roles');
-    
+    // Check permissions for current user based on API role
+    _checkPermissions();
+
     setState(() {});
+  }
+
+  void _checkPermissions() {
+    // Get current user's agoraId from profile
+    final profileAsync = ref.read(myProfileProvider);
+    final profile = profileAsync.valueOrNull;
+
+    if (profile != null && _apiMembers.isNotEmpty) {
+      // Find current user in team members
+      final currentMember = _apiMembers.where(
+        (m) => m.agoraId == profile.agoraId,
+      ).firstOrNull;
+
+      if (currentMember != null) {
+        // Admin has all permissions
+        final isAdmin = currentMember.role == TeamRole.admin;
+        _canCreateNotice = isAdmin;
+        _canAddMember = isAdmin;
+        _canManageRoles = isAdmin;
+      }
+    }
   }
 
   @override
@@ -102,21 +149,36 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddTeamMemberScreen(
-          onMembersAdded: (members) {
-            setState(() {
-              for (var member in members) {
-                final memberName = member['name'] as String;
-                if (!_members.contains(memberName)) {
-                  _members.add(memberName);
-                }
+          onMembersAdded: (members) async {
+            final teamService = TeamService();
+            int successCount = 0;
+
+            for (var member in members) {
+              final agoraId = member['id'] as String?;
+              if (agoraId != null) {
+                final result = await teamService.inviteMember(
+                  widget.team.id.toString(),
+                  agoraId,
+                );
+                result.when(
+                  success: (_) => successCount++,
+                  failure: (error) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('초대 실패: ${error.displayMessage}')),
+                      );
+                    }
+                  },
+                );
               }
-              _refreshRoles();
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${members.length}명을 팀원으로 추가했습니다'),
-              ),
-            );
+            }
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${successCount}명에게 초대를 보냈습니다')),
+              );
+              _loadTeamMembers(); // Reload member list
+            }
           },
         ),
       ),
@@ -124,6 +186,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   }
 
   void _removeMember(String memberName) {
+    // Find the member in the API members list
+    final member = _apiMembers.firstWhere(
+      (m) => m.effectiveDisplayName == memberName,
+      orElse: () => _apiMembers.first, // Fallback, should not happen
+    );
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -135,15 +203,31 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _members.remove(memberName);
-                DataManager().removeTeamMember(_teamName, memberName);
-                _refreshRoles();
-              });
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$memberName을(를) 제거했습니다')),
+
+              final teamService = TeamService();
+              final result = await teamService.removeMember(
+                widget.team.id.toString(),
+                member.memberId.toString(),
+              );
+
+              result.when(
+                success: (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$memberName을(를) 제거했습니다')),
+                    );
+                    _loadTeamMembers(); // Reload member list
+                  }
+                },
+                failure: (error) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('제거 실패: ${error.displayMessage}')),
+                    );
+                  }
+                },
               );
             },
             style: ElevatedButton.styleFrom(
@@ -241,70 +325,75 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     );
   }
 
+  Future<void> _openTeamChat() async {
+    setState(() => _isLoadingChat = true);
 
+    try {
+      final teamService = TeamService();
+      final result = await teamService.getTeamChat(widget.team.id.toString());
+
+      result.when(
+        success: (chat) {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ConversationScreen(
+                  chatId: chat.id.toString(),
+                  userName: _teamName,
+                  userImage: _currentTeam.profileImageUrl ?? '',
+                ),
+              ),
+            );
+          }
+        },
+        failure: (error) {
+          if (mounted) {
+            String message = '팀 채팅 로드 실패';
+            if (error.displayMessage.toLowerCase().contains('not found')) {
+              message = '팀 채팅방이 아직 생성되지 않았습니다.';
+            } else {
+              message = '팀 채팅 로드 실패: ${error.displayMessage}';
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+          }
+        },
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingChat = false);
+      }
+    }
+  }
 
   void _navigateToCreateNoticeScreen() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreateNoticeScreen(teamName: _teamName),
+        builder: (context) => CreateNoticeScreen(
+          teamId: widget.team.id.toString(),
+          teamName: _teamName,
+        ),
       ),
     );
   }
   
-  void _showTeamRenameDialog() {
-    _teamNameController.text = widget.teamName;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('팀 이름 변경'),
-        content: TextField(
-          controller: _teamNameController,
-          decoration: InputDecoration(
-            hintText: '새로운 팀 이름을 입력하세요',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.blue.shade400),
-            ),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade400,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _teamName = _teamNameController.text;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('팀 이름이 변경되었습니다: $_teamName'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            child: const Text('저장'),
-          ),
-        ],
+  void _navigateToEditTeamScreen() async {
+    final result = await Navigator.push<Team>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditTeamScreen(team: _currentTeam),
       ),
     );
+
+    if (result != null && mounted) {
+      setState(() {
+        _currentTeam = result;
+        _teamName = result.name;
+      });
+    }
   }
 
   void _showDeleteTeamDialog() {
@@ -323,14 +412,34 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               backgroundColor: Colors.red.shade400,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('팀이 삭제되었습니다'),
-                  duration: Duration(seconds: 2),
-                ),
+
+              final teamService = TeamService();
+              final result = await teamService.deleteTeam(widget.team.id.toString());
+
+              result.when(
+                success: (_) {
+                  if (mounted) {
+                    Navigator.pop(context); // Close screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('팀이 삭제되었습니다'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                failure: (error) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('팀 삭제 실패: ${error.displayMessage}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
               );
             },
             child: const Text('삭제'),
@@ -416,6 +525,31 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch profile and update permissions when loaded
+    final profileAsync = ref.watch(myProfileProvider);
+    profileAsync.whenData((profile) {
+      if (profile != null && _apiMembers.isNotEmpty) {
+        final currentMember = _apiMembers.where(
+          (m) => m.agoraId == profile.agoraId,
+        ).firstOrNull;
+
+        if (currentMember != null) {
+          final isAdmin = currentMember.role == TeamRole.admin;
+          if (_canCreateNotice != isAdmin || _canAddMember != isAdmin || _canManageRoles != isAdmin) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _canCreateNotice = isAdmin;
+                  _canAddMember = isAdmin;
+                  _canManageRoles = isAdmin;
+                });
+              }
+            });
+          }
+        }
+      }
+    });
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -434,7 +568,10 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => NoticeListScreen(teamName: _teamName),
+                  builder: (context) => NoticeListScreen(
+                    teamId: widget.team.id.toString(),
+                    teamName: _teamName,
+                  ),
                 ),
               );
             },
@@ -444,12 +581,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
               icon: const Icon(Icons.more_vert, color: Colors.black),
               itemBuilder: (BuildContext context) => [
                 PopupMenuItem(
-                  value: 'rename',
+                  value: 'edit',
                   child: const Row(
                     children: [
                       Icon(Icons.edit, size: 18, color: Colors.blue),
                       SizedBox(width: 12),
-                      Text('팀 이름 변경'),
+                      Text('팀 정보 수정'),
                     ],
                   ),
                 ),
@@ -465,8 +602,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                 ),
               ],
               onSelected: (value) {
-                if (value == 'rename') {
-                  _showTeamRenameDialog();
+                if (value == 'edit') {
+                  _navigateToEditTeamScreen();
                 } else if (value == 'delete') {
                   _showDeleteTeamDialog();
                 }
@@ -503,8 +640,8 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                       image: DecorationImage(
                         image: NetworkImage(
-                          widget.teamImage ??
-                              'https://picsum.photos/seed/$_teamName/200/200',
+                          _currentTeam.profileImageUrl ??
+                              'https://picsum.photos/seed/${_currentTeam.name}/200/200',
                         ),
                         fit: BoxFit.cover,
                       ),
@@ -532,21 +669,18 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TeamChatScreen(
-                              teamName: _teamName,
-                              teamIcon: widget.teamIcon,
-                              teamImage: widget.teamImage,
-                              members: _members,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('팀 채팅'),
+                      onPressed: _isLoadingChat ? null : _openTeamChat,
+                      icon: _isLoadingChat
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.chat_bubble_outline),
+                      label: Text(_isLoadingChat ? '로딩 중...' : '팀 채팅'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.shade400,
                         foregroundColor: Colors.white,

@@ -105,13 +105,23 @@ class ApiEndpoints {
   static String teamMemberRole(String id, String memberId) =>
       '/api/agora/teams/$id/members/$memberId/role';
 
+  // Team Invitations
+  static String teamInvitations(String teamId) =>
+      '/api/agora/teams/$teamId/invitations';
+  static const String teamInvitationsReceived =
+      '/api/agora/teams/invitations/received';
+  static String teamInvitationAccept(String invitationId) =>
+      '/api/agora/teams/invitations/$invitationId/accept';
+  static String teamInvitationReject(String invitationId) =>
+      '/api/agora/teams/invitations/$invitationId/reject';
+  static String teamChat(String teamId) => '/api/agora/teams/$teamId/chat';
+
   // ============ Team Profile ============
-  static String teamProfile(String teamId) =>
-      '/api/agora/teams/$teamId/profile';
-  static String teamProfileImage(String teamId) =>
-      '/api/agora/teams/$teamId/profile/image';
-  static String teamProfileMember(String teamId, String userId) =>
-      '/api/agora/teams/$teamId/profile/members/$userId';
+  static const String teamProfile = '/api/agora/team-profile';
+  static const String teamProfileImage = '/api/agora/team-profile/image';
+  static const String teamProfileExists = '/api/agora/team-profile/exists';
+  static String teamProfileByUserId(String userId) =>
+      '/api/agora/team-profile/users/$userId';
 
   // ============ Team Features ============
   // Notices

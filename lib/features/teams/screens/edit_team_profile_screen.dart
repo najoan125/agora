@@ -6,28 +6,46 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
 import '../../../data/services/team_service.dart';
 import '../../../data/services/file_service.dart';
+import '../../../data/models/team/team.dart';
 
-class CreateTeamProfileScreen extends ConsumerStatefulWidget {
-  const CreateTeamProfileScreen({Key? key}) : super(key: key);
+class EditTeamProfileScreen extends ConsumerStatefulWidget {
+  final TeamProfile teamProfile;
+
+  const EditTeamProfileScreen({
+    Key? key,
+    required this.teamProfile,
+  }) : super(key: key);
 
   @override
-  ConsumerState<CreateTeamProfileScreen> createState() =>
-      _CreateTeamProfileScreenState();
+  ConsumerState<EditTeamProfileScreen> createState() =>
+      _EditTeamProfileScreenState();
 }
 
-class _CreateTeamProfileScreenState
-    extends ConsumerState<CreateTeamProfileScreen> {
+class _EditTeamProfileScreenState
+    extends ConsumerState<EditTeamProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _displayNameController = TextEditingController();
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _bioController;
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;
   String? _selectedImagePath;
   bool _isLoading = false;
+  bool _imageChanged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 기존 프로필 데이터로 초기화
+    _displayNameController = TextEditingController(text: widget.teamProfile.displayName);
+    _bioController = TextEditingController(text: widget.teamProfile.bio ?? '');
+    _selectedImagePath = widget.teamProfile.profileImageUrl;
+  }
 
   @override
   void dispose() {
     _displayNameController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -36,6 +54,7 @@ class _CreateTeamProfileScreenState
     if (image != null) {
       setState(() {
         _selectedImagePath = image.path;
+        _imageChanged = true;
         if (!kIsWeb) {
           _selectedImage = File(image.path);
         }
@@ -43,7 +62,7 @@ class _CreateTeamProfileScreenState
     }
   }
 
-  Future<void> _createProfile() async {
+  Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -56,8 +75,8 @@ class _CreateTeamProfileScreenState
 
       String? uploadedImageUrl;
 
-      // 1. 이미지 업로드 (선택한 경우)
-      if (_selectedImage != null) {
+      // 1. 이미지가 변경된 경우 업로드
+      if (_imageChanged && _selectedImage != null) {
         final imageResult = await fileService.uploadImage(_selectedImage!);
         imageResult.when(
           success: (agoraFile) {
@@ -67,10 +86,15 @@ class _CreateTeamProfileScreenState
         );
       }
 
-      // 2. 팀 프로필 생성
-      final profileResult = await teamService.createTeamProfile(
-        displayName: _displayNameController.text,
-        profileImage: uploadedImageUrl,
+      // 2. 팀 프로필 수정
+      final profileResult = await teamService.updateTeamProfile(
+        displayName: _displayNameController.text != widget.teamProfile.displayName
+            ? _displayNameController.text
+            : null,
+        profileImage: _imageChanged ? uploadedImageUrl : null,
+        bio: _bioController.text != (widget.teamProfile.bio ?? '')
+            ? _bioController.text
+            : null,
       );
 
       profileResult.when(
@@ -80,14 +104,14 @@ class _CreateTeamProfileScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('팀 프로필이 생성되었습니다.')),
+          const SnackBar(content: Text('팀 프로필이 수정되었습니다.')),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('팀 프로필 생성에 실패했습니다: $e')),
+          SnackBar(content: Text('팀 프로필 수정에 실패했습니다: $e')),
         );
       }
     } finally {
@@ -110,7 +134,7 @@ class _CreateTeamProfileScreenState
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          '팀 프로필 만들기',
+          '팀 프로필 수정',
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontSize: 20,
@@ -125,7 +149,7 @@ class _CreateTeamProfileScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 팀 프로필 설명
+              // 프로필 설명
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -184,16 +208,23 @@ class _CreateTeamProfileScreenState
                         ),
                         child: _selectedImagePath != null
                             ? ClipOval(
-                                child: kIsWeb
-                                    ? Image.network(
+                                child: _imageChanged
+                                    ? (kIsWeb
+                                        ? Image.network(
+                                            _selectedImagePath!,
+                                            fit: BoxFit.cover,
+                                            width: 120,
+                                            height: 120,
+                                          )
+                                        : Image.file(
+                                            _selectedImage!,
+                                            fit: BoxFit.cover,
+                                          ))
+                                    : Image.network(
                                         _selectedImagePath!,
                                         fit: BoxFit.cover,
                                         width: 120,
                                         height: 120,
-                                      )
-                                    : Image.file(
-                                        _selectedImage!,
-                                        fit: BoxFit.cover,
                                       ),
                               )
                             : Icon(
@@ -231,7 +262,7 @@ class _CreateTeamProfileScreenState
                 child: TextButton(
                   onPressed: _pickImage,
                   child: Text(
-                    _selectedImagePath != null ? '이미지 변경' : '이미지 선택 (선택사항)',
+                    '이미지 변경',
                     style: TextStyle(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.w600,
@@ -294,13 +325,50 @@ class _CreateTeamProfileScreenState
                   color: Colors.grey.shade600,
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Bio
+              const Text(
+                '소개',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _bioController,
+                decoration: InputDecoration(
+                  hintText: '자기소개를 입력하세요 (선택사항)',
+                  prefixIcon: const Icon(Icons.info_outline),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                maxLength: 200,
+                maxLines: 3,
+                validator: (value) {
+                  if (value != null && value.length > 200) {
+                    return '소개는 최대 200자까지 가능합니다.';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 48),
 
-              // Create Button
+              // Update Button
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createProfile,
+                  onPressed: _isLoading ? null : _updateProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     shape: RoundedRectangleBorder(
@@ -319,7 +387,7 @@ class _CreateTeamProfileScreenState
                           ),
                         )
                       : const Text(
-                          '프로필 생성',
+                          '프로필 수정',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

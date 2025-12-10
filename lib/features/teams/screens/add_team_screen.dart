@@ -1,22 +1,23 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'add_team_member_screen.dart';
+import '../../../data/services/team_service.dart';
+import '../../../data/services/file_service.dart';
+import '../../../data/models/team/team.dart';
 
-class AddTeamScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>) onTeamAdded;
-
+class AddTeamScreen extends ConsumerStatefulWidget {
   const AddTeamScreen({
     Key? key,
-    required this.onTeamAdded,
   }) : super(key: key);
 
   @override
-  State<AddTeamScreen> createState() => _AddTeamScreenState();
+  ConsumerState<AddTeamScreen> createState() => _AddTeamScreenState();
 }
 
-class _AddTeamScreenState extends State<AddTeamScreen> {
+class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _teamDescriptionController;
   
@@ -24,19 +25,10 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   final ImagePicker _picker = ImagePicker();
   XFile? _pickedFile;
   String? _selectedImage; // No default image
-  
-  // Icon selection
-  String _selectedIcon = '🛡️';
-  final List<String> _availableIcons = [
-    '🛡️', '🚀', '💼', '🎓', '⚽', '✈️', '🎵', '🍔', 
-    '💻', '🎨', '🏥', '🏗️', '🎬', '🎮', '📷', '💡',
-    '🔥', '💧', '🌱', '⚡', '⭐', '❤️', '🤝', '📢'
-  ];
-
-  // Mode: true = Image, false = Icon
-  bool _isImageMode = true;
 
   final List<Map<String, dynamic>> _selectedMembers = [];
+
+  bool _isLoading = false;
 
 
 
@@ -64,7 +56,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
     }
   }
 
-  void _addTeam() {
+  Future<void> _addTeam() async {
     if (_teamNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('팀 이름을 입력해주세요')),
@@ -72,22 +64,66 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
       return;
     }
 
-    final newTeam = {
-      'name': _teamNameController.text,
-      'member': '${_selectedMembers.length}명',
-      'icon': _isImageMode ? null : _selectedIcon,
-      'image': _isImageMode ? (_pickedFile?.path ?? _selectedImage) : null,
-      'members': _selectedMembers.map((m) => m['name']).toList(),
-      'description': _teamDescriptionController.text,
-    };
+    setState(() => _isLoading = true);
 
-    widget.onTeamAdded(newTeam);
+    try {
+      final teamService = TeamService();
+      final fileService = FileService();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${_teamNameController.text}을 생성했습니다')),
-    );
+      // 1. 이미지 업로드 (선택한 경우)
+      String? uploadedImageUrl;
+      if (_pickedFile != null) {
+        final imageResult = await fileService.uploadImage(File(_pickedFile!.path));
+        imageResult.when(
+          success: (agoraFile) => uploadedImageUrl = agoraFile.downloadUrl,
+          failure: (_) {}, // 이미지 업로드 실패는 무시
+        );
+      }
 
-    Navigator.pop(context);
+      // 2. 팀 생성 API 호출
+      final teamResult = await teamService.createTeam(
+        name: _teamNameController.text,
+        description: _teamDescriptionController.text.isNotEmpty
+            ? _teamDescriptionController.text
+            : null,
+        profileImage: uploadedImageUrl,
+      );
+
+      Team? createdTeam;
+      teamResult.when(
+        success: (team) => createdTeam = team,
+        failure: (error) => throw Exception(error.displayMessage),
+      );
+
+      // 3. 팀원 초대 (선택된 멤버가 있는 경우)
+      if (createdTeam != null && _selectedMembers.isNotEmpty) {
+        final teamId = createdTeam!.id.toString();
+        for (final member in _selectedMembers) {
+          final agoraId = member['id'] as String?;
+          if (agoraId != null && agoraId.isNotEmpty) {
+            await teamService.inviteMember(teamId, agoraId);
+          }
+        }
+      }
+
+      // 4. 성공 처리
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_teamNameController.text}을 생성했습니다')),
+        );
+        Navigator.pop(context, true); // true 반환하여 목록 새로고침 트리거
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('팀 생성에 실패했습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -108,207 +144,77 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Type Selection (Image vs Icon)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isImageMode = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isImageMode ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: _isImageMode
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '이미지',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isImageMode = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: !_isImageMode ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: !_isImageMode
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '아이콘',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Selection Area
-            if (_isImageMode) ...[
-              // Image Selection Mode (Center-aligned)
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: _pickedFile != null
-                          ? (kIsWeb
-                              ? Image.network(
-                                  _pickedFile!.path,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                )
-                              : Image.file(
-                                  File(_pickedFile!.path),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                ))
-                          : (_selectedImage != null && _selectedImage!.startsWith('http')
-                              ? Image.network(
-                                  _selectedImage!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Center(
-                                      child: Icon(Icons.error_outline,
-                                          color: Colors.red),
-                                    );
-                                  },
-                                )
-                              : Center(
-                                  child: Icon(Icons.add_photo_alternate,
-                                      size: 40, color: Colors.grey.shade400),
-                                )),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton(
-                  onPressed: _pickImage,
-                  child: Text(
-                    _pickedFile != null || (_selectedImage != null && _selectedImage!.startsWith('http'))
-                        ? '이미지 변경'
-                        : '이미지 선택',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.blue.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-
-            ] else ...[
-              // Icon Selection Mode
-              Center(
+            // 팀 이미지 선택
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
                 child: Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    shape: BoxShape.circle,
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  child: Center(
-                    child: Text(
-                      _selectedIcon,
-                      style: const TextStyle(fontSize: 50),
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: _pickedFile != null
+                        ? (kIsWeb
+                            ? Image.network(
+                                _pickedFile!.path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Image.file(
+                                File(_pickedFile!.path),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              ))
+                        : (_selectedImage != null && _selectedImage!.startsWith('http')
+                            ? Image.network(
+                                _selectedImage!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Center(
+                                child: Icon(Icons.add_photo_alternate,
+                                    size: 40, color: Colors.grey.shade400),
+                              )),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 6,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: _pickImage,
+                child: Text(
+                  _pickedFile != null || (_selectedImage != null && _selectedImage!.startsWith('http'))
+                      ? '이미지 변경'
+                      : '이미지 선택',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.blue.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                itemCount: _availableIcons.length,
-                itemBuilder: (context, index) {
-                  final icon = _availableIcons[index];
-                  final isSelected = _selectedIcon == icon;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedIcon = icon),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue.shade100 : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.grey.shade200,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          icon,
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
-            ],
+            ),
 
             const SizedBox(height: 32),
             
@@ -431,9 +337,18 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _addTeam,
-                    icon: const Icon(Icons.add),
-                    label: const Text('팀 만들기'),
+                    onPressed: _isLoading ? null : _addTeam,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.add),
+                    label: Text(_isLoading ? '생성 중...' : '팀 만들기'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade400,
                       foregroundColor: Colors.white,

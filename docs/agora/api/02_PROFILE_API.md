@@ -1,10 +1,18 @@
-# Agora 프로필 API
+# Agora 프로필 API (개인 프로필)
 
 ## Base URL
 `/api/agora/profile`
 
 ## 인증
 Bearer Token (OAuth 2.0)
+
+---
+
+## 개요
+
+Agora에는 두 가지 프로필이 있습니다:
+- **개인 프로필 (이 문서)**: 친구 컨텍스트에서 사용 (`/api/agora/profile`)
+- **팀 프로필**: 팀 컨텍스트에서 사용 (`/api/agora/team-profile`) → [팀 프로필 API](./11_TEAM_PROFILE_API.md) 참조
 
 ---
 

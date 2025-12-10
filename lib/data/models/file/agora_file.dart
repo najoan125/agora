@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 part 'agora_file.g.dart';
 
@@ -19,15 +20,20 @@ enum FileType {
 /// 파일 모델
 @JsonSerializable()
 class AgoraFile {
+  @JsonKey(name: 'fileId', fromJson: _idFromJson, toJson: _idToJson)
   final String id;
   final String originalName;
+  @JsonKey(name: 'fileName')
   final String storedName;
   final String mimeType;
+  @JsonKey(name: 'fileSize')
   final int size;
+  @JsonKey(name: 'fileType')
   final FileType type;
+  @JsonKey(fromJson: _nullableUrlFromJson)
   final String? thumbnailUrl;
+  @JsonKey(name: 'fileUrl', fromJson: _urlFromJson)
   final String downloadUrl;
-  final String uploaderId;
   final DateTime createdAt;
 
   const AgoraFile({
@@ -39,7 +45,6 @@ class AgoraFile {
     required this.type,
     this.thumbnailUrl,
     required this.downloadUrl,
-    required this.uploaderId,
     required this.createdAt,
   });
 
@@ -93,4 +98,30 @@ class FileUploadResponse {
   factory FileUploadResponse.fromJson(Map<String, dynamic> json) =>
       _$FileUploadResponseFromJson(json);
   Map<String, dynamic> toJson() => _$FileUploadResponseToJson(this);
+}
+
+// Helper functions for id conversion
+String _idFromJson(dynamic value) => value.toString();
+dynamic _idToJson(String value) => value;
+
+// Helper function for URL - adds base URL if needed
+String _urlFromJson(dynamic value) {
+  if (value == null) return '';
+  final url = value.toString();
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // 상대 경로인 경우 base URL 추가
+  return '${ApiEndpoints.baseUrl}$url';
+}
+
+// Helper function for nullable URL
+String? _nullableUrlFromJson(dynamic value) {
+  if (value == null) return null;
+  final url = value.toString();
+  if (url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return '${ApiEndpoints.baseUrl}$url';
 }

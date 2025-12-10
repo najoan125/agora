@@ -15,14 +15,14 @@ import '../widgets/message_bubble.dart';
 
 class TeamChatScreen extends StatefulWidget {
   final String teamName;
-  final String teamIcon;
+  final String? teamIcon;
   final String? teamImage;
   final List<String> members;
 
   const TeamChatScreen({
     super.key,
     required this.teamName,
-    required this.teamIcon,
+    this.teamIcon,
     this.teamImage,
     required this.members,
   });
@@ -322,14 +322,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                                   )
                                 : null,
                           ),
-                          child: widget.teamImage == null
-                              ? Center(
-                                  child: Text(
-                                    widget.teamIcon,
-                                    style: const TextStyle(fontSize: 24),
-                                  ),
-                                )
-                              : null,
                         ),
                         const SizedBox(width: 12),
                         Column(

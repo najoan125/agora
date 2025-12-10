@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
+import '../../data/models/team/team.dart';
 import '../../shared/providers/riverpod_profile_provider.dart';
 import '../../shared/providers/friend_provider.dart';
 import '../../shared/providers/team_provider.dart';
@@ -17,6 +18,7 @@ import '../teams/screens/create_team_profile_screen.dart';
 import '../../data/models/chat/chat.dart';
 import '../chat/widgets/chat_tile.dart';
 import '../../shared/providers/chat_provider.dart';
+import '../teams/screens/edit_team_profile_screen.dart';
 
 import 'screens/notification_screen.dart';
 import '../chat/screens/create_group_screen.dart';
@@ -712,123 +714,117 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildTeamList() {
     final teamsAsync = ref.watch(teamListProvider);
+    final teamProfileAsync = ref.watch(myTeamProfileProvider);
 
-    return teamsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(child: Text('오류: $error')),
-      data: (teams) {
-        // 현재 선택된 팀이 있는 경우 팀 프로필 조회, 없는 경우 개인 프로필 표시
-        final firstTeam = teams.isNotEmpty ? teams.first : null;
-
-        return GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(teamListProvider);
-              if (firstTeam != null) {
-                ref.invalidate(myTeamProfileProvider(firstTeam.id));
-              }
-            },
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _buildTeamProfileHeader(firstTeam),
-                ),
-                SliverAppBar(
-                  backgroundColor: Colors.white,
-                  expandedHeight: 74.0,
-                  toolbarHeight: 74.0,
-                  collapsedHeight: 74.0,
-                  floating: true,
-                  snap: true,
-                  pinned: false,
-                  elevation: 0,
-                  flexibleSpace: FlexibleSpaceBar(
-                    collapseMode: CollapseMode.none,
-                    background: _buildFloatingSearchBar(),
-                  ),
-                ),
-                SliverList(
-                  delegate: SliverChildListDelegate(
-                    [
-                      const SizedBox(height: 20),
-
-                      // 팀이 없는 경우
-                      if (teams.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.groups_outlined,
-                                    size: 48, color: AppTheme.textSecondary),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  '가입한 팀이 없습니다',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  '팀을 만들거나 초대를 받아보세요!',
-                                  style:
-                                      TextStyle(color: AppTheme.textSecondary),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        Builder(
-                          builder: (context) {
-                            var filteredTeams = teams.where((t) {
-                              if (_searchQuery.isEmpty) return true;
-                              return t.name
-                                  .toLowerCase()
-                                  .contains(_searchQuery.toLowerCase());
-                            }).toList();
-
-                            if (_sortOption == 'name') {
-                              filteredTeams
-                                  .sort((a, b) => a.name.compareTo(b.name));
-                            }
-
-                            return CollapsibleSection(
-                              title: '팀 목록',
-                              count: filteredTeams.length,
-                              onAdd: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AddTeamScreen(
-                                      onTeamAdded: (team) {
-                                        ref.invalidate(teamListProvider);
-                                      },
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Column(
-                                children: filteredTeams
-                                    .map((team) => _buildTeamTile(team))
-                                    .toList(),
-                              ),
-                            );
-                          },
-                        ),
-
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(teamListProvider);
+          ref.invalidate(myTeamProfileProvider);
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _buildTeamProfileHeader(teamProfileAsync),
             ),
-          ),
-        );
-      },
+            SliverAppBar(
+              backgroundColor: Colors.white,
+              expandedHeight: 74.0,
+              toolbarHeight: 74.0,
+              collapsedHeight: 74.0,
+              floating: true,
+              snap: true,
+              pinned: false,
+              elevation: 0,
+              flexibleSpace: FlexibleSpaceBar(
+                collapseMode: CollapseMode.none,
+                background: _buildFloatingSearchBar(),
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  const SizedBox(height: 20),
+                  teamsAsync.when(
+                    loading: () => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                    error: (error, stack) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text('오류: $error'),
+                      ),
+                    ),
+                    data: (teams) {
+                      var filteredTeams = teams.where((t) {
+                        if (_searchQuery.isEmpty) return true;
+                        return t.name.toLowerCase().contains(_searchQuery.toLowerCase());
+                      }).toList();
+
+                      if (_sortOption == 'name') {
+                        filteredTeams.sort((a, b) => a.name.compareTo(b.name));
+                      }
+
+                      return CollapsibleSection(
+                        title: '팀 목록',
+                        count: filteredTeams.length,
+                        onAdd: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AddTeamScreen(),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            ref.invalidate(teamListProvider);
+                          }
+                        },
+                        child: teams.isEmpty
+                            ? _buildEmptyTeamState()
+                            : Column(
+                                children: filteredTeams.map((team) => _buildTeamTile(team)).toList(),
+                              ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyTeamState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            const Icon(Icons.groups_outlined, size: 48, color: AppTheme.textSecondary),
+            const SizedBox(height: 16),
+            const Text(
+              '가입한 팀이 없습니다',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '팀을 만들거나 초대를 받아보세요!',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -899,154 +895,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildTeamProfileHeader(dynamic team) {
-    if (team == null) {
-      // 팀이 없는 경우 개인 프로필 표시
-      final profileAsync = ref.watch(myProfileProvider);
-      return profileAsync.when(
-        loading: () => const SizedBox(
-          height: 110,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        error: (_, __) => const SizedBox.shrink(),
-        data: (profile) {
-          final user = profile != null
-              ? {
-                  'name': profile.displayName,
-                  'statusMessage': profile.statusMessage ?? '상태 메시지를 설정하세요',
-                  'image': profile.profileImageUrl,
-                  'avatar': profile.displayName.isNotEmpty
-                      ? profile.displayName[0]
-                      : '?',
-                }
-              : {
-                  'name': '사용자',
-                  'statusMessage': '상태 메시지를 설정하세요',
-                  'image': null,
-                  'avatar': '?',
-                };
-          return _buildProfileHeader(user);
-        },
-      );
-    }
-
-    // 팀이 있는 경우 팀 프로필 조회
-    final teamProfileAsync = ref.watch(myTeamProfileProvider(team.id));
+  Widget _buildTeamProfileHeader(AsyncValue<TeamProfile?> teamProfileAsync) {
     return teamProfileAsync.when(
       loading: () => const SizedBox(
         height: 110,
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) {
-        // 팀 프로필이 없는 경우 개인 프로필 표시
-        final profileAsync = ref.watch(myProfileProvider);
-        return profileAsync.when(
-          loading: () => const SizedBox(
-            height: 110,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, __) => const SizedBox.shrink(),
-          data: (profile) {
-            final user = profile != null
-                ? {
-                    'name': profile.displayName,
-                    'statusMessage': '팀: ${team.name}',
-                    'image': profile.profileImageUrl,
-                    'avatar': profile.displayName.isNotEmpty
-                        ? profile.displayName[0]
-                        : '?',
-                  }
-                : {
-                    'name': '사용자',
-                    'statusMessage': '팀: ${team.name}',
-                    'image': null,
-                    'avatar': '?',
-                  };
-            return _buildProfileHeader(user);
-          },
-        );
-      },
+      error: (_, __) => _buildCreateTeamProfileButton(),
       data: (teamProfile) {
         if (teamProfile == null) {
-          // 팀 프로필이 없는 경우 - 생성 버튼 표시
-          return Container(
-            color: Colors.white,
-            padding:
-                const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
-            child: Row(
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey.shade300, width: 2),
-                  ),
-                  child: Icon(
-                    Icons.person_add,
-                    size: 35,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '팀 프로필을 만들어보세요',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '팀: ${team.name}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CreateTeamProfileScreen(
-                          teamId: team.id,
-                          teamName: team.name,
-                        ),
-                      ),
-                    );
-                    if (result == true && mounted) {
-                      ref.invalidate(myTeamProfileProvider(team.id));
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('만들기'),
-                ),
-              ],
-            ),
-          );
+          return _buildCreateTeamProfileButton();
         }
 
         // 팀 프로필이 있는 경우 표시
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
-            onTap: () {
-              // 팀 프로필 수정 화면으로 이동 (추후 구현 가능)
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditTeamProfileScreen(
+                    teamProfile: teamProfile,
+                  ),
+                ),
+              );
+              if (result == true && mounted) {
+                ref.invalidate(myTeamProfileProvider);
+              }
             },
             child: Container(
               color: Colors.white,
@@ -1070,35 +946,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: teamProfile.profileImageUrl == null
                         ? Center(
                             child: Text(
-                              teamProfile.displayName.isNotEmpty
-                                  ? teamProfile.displayName[0]
-                                  : '?',
-                              style: const TextStyle(fontSize: 30),
+                              teamProfile.displayName.isNotEmpty ? teamProfile.displayName[0] : '?',
+                              style: const TextStyle(fontSize: 30, color: Colors.white),
                             ),
                           )
                         : null,
                   ),
                   const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        teamProfile.displayName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          teamProfile.displayName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '팀: ${team.name}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
+                        if (teamProfile.bio != null && teamProfile.bio!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            teamProfile.bio!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: AppTheme.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1106,6 +986,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCreateTeamProfileButton() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
+      child: Row(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade300, width: 2),
+            ),
+            child: Icon(
+              Icons.person_add,
+              size: 35,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '팀 프로필을 만들어보세요',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '팀원들에게 보여질 프로필입니다',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreateTeamProfileScreen(),
+                ),
+              );
+              if (result == true && mounted) {
+                ref.invalidate(myTeamProfileProvider);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('만들기'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1153,11 +1102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             context,
             MaterialPageRoute(
               builder: (context) => TeamDetailScreen(
-                teamName: team.name,
-                teamIcon: '🛡️',
-                members: [], // Will be loaded from API
-                teamImage: team.profileImageUrl ??
-                    'https://picsum.photos/seed/${team.name}/200/200',
+                team: team,
               ),
             ),
           );

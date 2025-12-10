@@ -6,28 +6,44 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
 import '../../../data/services/team_service.dart';
 import '../../../data/services/file_service.dart';
+import '../../../data/models/team/team.dart';
 
-class CreateTeamProfileScreen extends ConsumerStatefulWidget {
-  const CreateTeamProfileScreen({Key? key}) : super(key: key);
+class EditTeamScreen extends ConsumerStatefulWidget {
+  final Team team;
+
+  const EditTeamScreen({
+    Key? key,
+    required this.team,
+  }) : super(key: key);
 
   @override
-  ConsumerState<CreateTeamProfileScreen> createState() =>
-      _CreateTeamProfileScreenState();
+  ConsumerState<EditTeamScreen> createState() => _EditTeamScreenState();
 }
 
-class _CreateTeamProfileScreenState
-    extends ConsumerState<CreateTeamProfileScreen> {
+class _EditTeamScreenState extends ConsumerState<EditTeamScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _displayNameController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;
   String? _selectedImagePath;
   bool _isLoading = false;
+  bool _imageChanged = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.team.name);
+    _descriptionController =
+        TextEditingController(text: widget.team.description ?? '');
+    _selectedImagePath = widget.team.profileImageUrl;
+  }
 
   @override
   void dispose() {
-    _displayNameController.dispose();
+    _nameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -36,6 +52,7 @@ class _CreateTeamProfileScreenState
     if (image != null) {
       setState(() {
         _selectedImagePath = image.path;
+        _imageChanged = true;
         if (!kIsWeb) {
           _selectedImage = File(image.path);
         }
@@ -43,7 +60,7 @@ class _CreateTeamProfileScreenState
     }
   }
 
-  Future<void> _createProfile() async {
+  Future<void> _updateTeam() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -56,38 +73,47 @@ class _CreateTeamProfileScreenState
 
       String? uploadedImageUrl;
 
-      // 1. 이미지 업로드 (선택한 경우)
-      if (_selectedImage != null) {
+      // 1. 이미지가 변경된 경우 업로드
+      if (_imageChanged && _selectedImage != null) {
         final imageResult = await fileService.uploadImage(_selectedImage!);
         imageResult.when(
           success: (agoraFile) {
             uploadedImageUrl = agoraFile.downloadUrl;
           },
-          failure: (_) {}, // 이미지 업로드 실패는 무시 (선택사항)
+          failure: (error) {
+            throw Exception('이미지 업로드 실패: ${error.displayMessage}');
+          },
         );
       }
 
-      // 2. 팀 프로필 생성
-      final profileResult = await teamService.createTeamProfile(
-        displayName: _displayNameController.text,
-        profileImage: uploadedImageUrl,
+      // 2. 팀 정보 수정
+      final teamResult = await teamService.updateTeam(
+        widget.team.id.toString(),
+        name: _nameController.text != widget.team.name
+            ? _nameController.text
+            : null,
+        description:
+            _descriptionController.text != (widget.team.description ?? '')
+                ? _descriptionController.text
+                : null,
+        profileImage: _imageChanged ? uploadedImageUrl : null,
       );
 
-      profileResult.when(
-        success: (_) {},
+      teamResult.when(
+        success: (updatedTeam) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('팀 정보가 수정되었습니다.')),
+            );
+            Navigator.pop(context, updatedTeam);
+          }
+        },
         failure: (error) => throw Exception(error.displayMessage),
       );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('팀 프로필이 생성되었습니다.')),
-        );
-        Navigator.pop(context, true);
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('팀 프로필 생성에 실패했습니다: $e')),
+          SnackBar(content: Text('팀 정보 수정에 실패했습니다: $e')),
         );
       }
     } finally {
@@ -110,7 +136,7 @@ class _CreateTeamProfileScreenState
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          '팀 프로필 만들기',
+          '팀 정보 수정',
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontSize: 20,
@@ -125,7 +151,7 @@ class _CreateTeamProfileScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 팀 프로필 설명
+              // 팀 설명
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -142,7 +168,7 @@ class _CreateTeamProfileScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '팀 프로필',
+                            '팀 정보',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -151,7 +177,7 @@ class _CreateTeamProfileScreenState
                           ),
                           SizedBox(height: 2),
                           Text(
-                            '팀원들에게 보여질 프로필입니다',
+                            '팀의 기본 정보를 수정합니다',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
@@ -165,7 +191,7 @@ class _CreateTeamProfileScreenState
               ),
               const SizedBox(height: 32),
 
-              // 프로필 이미지
+              // 팀 프로필 이미지
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
@@ -184,20 +210,37 @@ class _CreateTeamProfileScreenState
                         ),
                         child: _selectedImagePath != null
                             ? ClipOval(
-                                child: kIsWeb
-                                    ? Image.network(
+                                child: _imageChanged
+                                    ? (kIsWeb
+                                        ? Image.network(
+                                            _selectedImagePath!,
+                                            fit: BoxFit.cover,
+                                            width: 120,
+                                            height: 120,
+                                          )
+                                        : Image.file(
+                                            _selectedImage!,
+                                            fit: BoxFit.cover,
+                                            width: 120,
+                                            height: 120,
+                                          ))
+                                    : Image.network(
                                         _selectedImagePath!,
                                         fit: BoxFit.cover,
                                         width: 120,
                                         height: 120,
-                                      )
-                                    : Image.file(
-                                        _selectedImage!,
-                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return Icon(
+                                            Icons.groups,
+                                            size: 60,
+                                            color: Colors.grey.shade400,
+                                          );
+                                        },
                                       ),
                               )
                             : Icon(
-                                Icons.person,
+                                Icons.groups,
                                 size: 60,
                                 color: Colors.grey.shade400,
                               ),
@@ -231,7 +274,7 @@ class _CreateTeamProfileScreenState
                 child: TextButton(
                   onPressed: _pickImage,
                   child: Text(
-                    _selectedImagePath != null ? '이미지 변경' : '이미지 선택 (선택사항)',
+                    '이미지 변경',
                     style: TextStyle(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.w600,
@@ -241,9 +284,9 @@ class _CreateTeamProfileScreenState
               ),
               const SizedBox(height: 32),
 
-              // Display Name
+              // 팀 이름
               const Text(
-                '팀 내 표시 이름',
+                '팀 이름',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -252,9 +295,9 @@ class _CreateTeamProfileScreenState
               ),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _displayNameController,
+                controller: _nameController,
                 decoration: InputDecoration(
-                  hintText: '팀에서 사용할 닉네임을 입력하세요',
+                  hintText: '팀 이름을 입력하세요',
                   prefixIcon: const Icon(Icons.badge_outlined),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -262,7 +305,8 @@ class _CreateTeamProfileScreenState
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -275,32 +319,62 @@ class _CreateTeamProfileScreenState
                   filled: true,
                   fillColor: Colors.grey.shade50,
                 ),
-                maxLength: 100,
+                maxLength: 50,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return '표시 이름을 입력해주세요.';
+                    return '팀 이름을 입력해주세요.';
                   }
-                  if (value.length > 100) {
-                    return '표시 이름은 최대 100자까지 가능합니다.';
+                  if (value.length > 50) {
+                    return '팀 이름은 최대 50자까지 가능합니다.';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 8),
-              Text(
-                '팀원들에게 표시될 이름입니다.',
+              const SizedBox(height: 24),
+
+              // 팀 설명
+              const Text(
+                '팀 설명',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
                 ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  hintText: '팀에 대한 설명을 입력하세요 (선택사항)',
+                  prefixIcon: const Icon(Icons.info_outline),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                maxLength: 200,
+                maxLines: 3,
+                validator: (value) {
+                  if (value != null && value.length > 200) {
+                    return '팀 설명은 최대 200자까지 가능합니다.';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 48),
 
-              // Create Button
+              // 수정 버튼
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createProfile,
+                  onPressed: _isLoading ? null : _updateTeam,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
                     shape: RoundedRectangleBorder(
@@ -319,7 +393,7 @@ class _CreateTeamProfileScreenState
                           ),
                         )
                       : const Text(
-                          '프로필 생성',
+                          '팀 정보 수정',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

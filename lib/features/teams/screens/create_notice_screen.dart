@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../data/data_manager.dart';
+import '../../../data/services/team_service.dart';
 
 class CreateNoticeScreen extends StatefulWidget {
+  final String teamId;
   final String teamName;
 
   const CreateNoticeScreen({
     Key? key,
+    required this.teamId,
     required this.teamName,
   }) : super(key: key);
 
@@ -16,6 +18,7 @@ class CreateNoticeScreen extends StatefulWidget {
 class _CreateNoticeScreenState extends State<CreateNoticeScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -24,7 +27,7 @@ class _CreateNoticeScreenState extends State<CreateNoticeScreen> {
     super.dispose();
   }
 
-  void _registerNotice() {
+  Future<void> _registerNotice() async {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
 
@@ -35,12 +38,39 @@ class _CreateNoticeScreenState extends State<CreateNoticeScreen> {
       return;
     }
 
-    DataManager().addNotice(widget.teamName, title, content);
-    
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('공지사항이 등록되었습니다')),
-    );
+    setState(() => _isLoading = true);
+
+    try {
+      final teamService = TeamService();
+      final result = await teamService.createNotice(
+        widget.teamId,
+        title: title,
+        content: content,
+        isPinned: false,
+      );
+
+      result.when(
+        success: (_) {
+          if (mounted) {
+            Navigator.pop(context, true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('공지사항이 등록되었습니다')),
+            );
+          }
+        },
+        failure: (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('공지사항 등록 실패: ${error.displayMessage}')),
+            );
+          }
+        },
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -57,17 +87,26 @@ class _CreateNoticeScreenState extends State<CreateNoticeScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          TextButton(
-            onPressed: _registerNotice,
-            child: const Text(
-              '완료',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
-            ),
-          ),
+          _isLoading
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : TextButton(
+                  onPressed: _registerNotice,
+                  child: const Text(
+                    '완료',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
         ],
       ),
       body: Padding(

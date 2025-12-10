@@ -1,6 +1,18 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../../../core/constants/api_endpoints.dart';
 
 part 'team.g.dart';
+
+// Helper function for nullable URL - adds base URL if needed
+String? _imageUrlFromJson(dynamic value) {
+  if (value == null) return null;
+  final url = value.toString();
+  if (url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return '${ApiEndpoints.baseUrl}$url';
+}
 
 /// 팀 모델
 @JsonSerializable()
@@ -9,7 +21,7 @@ class Team {
   final dynamic id;
   final String name;
   final String? description;
-  @JsonKey(name: 'profileImage')
+  @JsonKey(name: 'profileImage', fromJson: _imageUrlFromJson)
   final String? profileImageUrl;
   @JsonKey(name: 'creatorEmail')
   final String? creatorId;
@@ -61,22 +73,22 @@ class Team {
 /// 팀 멤버 모델
 @JsonSerializable()
 class TeamMember {
-  final String id;
+  final int memberId;
+  final int userId;
   final String agoraId;
-  final String displayName;
-  final String? profileImageUrl;
-  final String? teamDisplayName; // 팀 내 표시명
-  final String? teamProfileImageUrl; // 팀 프로필 이미지
+  final String? displayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
+  final String? profileImage;
+  @JsonKey(name: 'roleName')
   final TeamRole role;
   final DateTime joinedAt;
 
   const TeamMember({
-    required this.id,
+    required this.memberId,
+    required this.userId,
     required this.agoraId,
-    required this.displayName,
-    this.profileImageUrl,
-    this.teamDisplayName,
-    this.teamProfileImageUrl,
+    this.displayName,
+    this.profileImage,
     required this.role,
     required this.joinedAt,
   });
@@ -85,20 +97,17 @@ class TeamMember {
       _$TeamMemberFromJson(json);
   Map<String, dynamic> toJson() => _$TeamMemberToJson(this);
 
-  /// 표시할 이름 (팀 프로필 우선)
-  String get effectiveDisplayName => teamDisplayName ?? displayName;
-
-  /// 표시할 프로필 이미지 (팀 프로필 우선)
-  String? get effectiveProfileImageUrl => teamProfileImageUrl ?? profileImageUrl;
+  /// 표시할 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get effectiveDisplayName => displayName ?? agoraId;
 
   bool get isAdmin => role == TeamRole.admin;
 }
 
 /// 팀 역할
 enum TeamRole {
-  @JsonValue('ADMIN')
+  @JsonValue('admin')
   admin,
-  @JsonValue('MEMBER')
+  @JsonValue('member')
   member,
 }
 
@@ -126,23 +135,24 @@ class TeamListResponse {
   Map<String, dynamic> toJson() => _$TeamListResponseToJson(this);
 }
 
-/// 팀 프로필 모델
+/// 팀 프로필 모델 (사용자당 하나의 팀 프로필)
 @JsonSerializable()
 class TeamProfile {
-  final String id;
-  final String teamId;
-  final String userId;
+  final int userId;
+  final String? userEmail;
   final String displayName;
+  @JsonKey(name: 'profileImage', fromJson: _imageUrlFromJson)
   final String? profileImageUrl;
+  final String? bio;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   const TeamProfile({
-    required this.id,
-    required this.teamId,
     required this.userId,
+    this.userEmail,
     required this.displayName,
     this.profileImageUrl,
+    this.bio,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -152,15 +162,21 @@ class TeamProfile {
   Map<String, dynamic> toJson() => _$TeamProfileToJson(this);
 }
 
+// Helper functions for Notice
+String _noticeIdFromJson(dynamic value) => value.toString();
+String _noticeTeamIdFromJson(dynamic value) => value.toString();
+
 /// 공지 모델
 @JsonSerializable()
 class Notice {
+  @JsonKey(name: 'noticeId', fromJson: _noticeIdFromJson)
   final String id;
+  @JsonKey(fromJson: _noticeTeamIdFromJson)
   final String teamId;
   final String title;
   final String content;
+  @JsonKey(name: 'authorEmail')
   final String authorId;
-  final String authorName;
   final bool isPinned;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -171,11 +187,13 @@ class Notice {
     required this.title,
     required this.content,
     required this.authorId,
-    required this.authorName,
     this.isPinned = false,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// authorName getter (authorEmail에서 @ 앞부분 추출)
+  String get authorName => authorId.split('@').first;
 
   factory Notice.fromJson(Map<String, dynamic> json) => _$NoticeFromJson(json);
   Map<String, dynamic> toJson() => _$NoticeToJson(this);
@@ -280,4 +298,65 @@ class Event {
     final now = DateTime.now();
     return now.isAfter(startTime) && now.isBefore(endTime);
   }
+}
+
+/// 초대 상태
+enum InvitationStatus {
+  @JsonValue('PENDING')
+  pending,
+  @JsonValue('ACCEPTED')
+  accepted,
+  @JsonValue('REJECTED')
+  rejected,
+}
+
+/// 팀 초대 모델
+@JsonSerializable()
+class TeamInvitation {
+  final int invitationId;
+  final int teamId;
+  final String teamName;
+  @JsonKey(fromJson: _imageUrlFromJson)
+  final String? teamProfileImage;
+  final String fromAgoraId;
+  final String? fromDisplayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
+  final String? fromProfileImage;
+  final String toAgoraId;
+  final String? toDisplayName;
+  @JsonKey(fromJson: _imageUrlFromJson)
+  final String? toProfileImage;
+  final InvitationStatus status;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const TeamInvitation({
+    required this.invitationId,
+    required this.teamId,
+    required this.teamName,
+    this.teamProfileImage,
+    required this.fromAgoraId,
+    this.fromDisplayName,
+    this.fromProfileImage,
+    required this.toAgoraId,
+    this.toDisplayName,
+    this.toProfileImage,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory TeamInvitation.fromJson(Map<String, dynamic> json) =>
+      _$TeamInvitationFromJson(json);
+  Map<String, dynamic> toJson() => _$TeamInvitationToJson(this);
+
+  bool get isPending => status == InvitationStatus.pending;
+  bool get isAccepted => status == InvitationStatus.accepted;
+  bool get isRejected => status == InvitationStatus.rejected;
+
+  /// 보낸 사람 표시 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get fromEffectiveDisplayName => fromDisplayName ?? fromAgoraId;
+
+  /// 받는 사람 표시 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get toEffectiveDisplayName => toDisplayName ?? toAgoraId;
 }
