@@ -31,24 +31,22 @@ Map<String, dynamic> _$TeamToJson(Team instance) => <String, dynamic>{
     };
 
 TeamMember _$TeamMemberFromJson(Map<String, dynamic> json) => TeamMember(
-      id: json['id'] as String,
+      memberId: (json['memberId'] as num).toInt(),
+      userId: (json['userId'] as num).toInt(),
       agoraId: json['agoraId'] as String,
-      displayName: json['displayName'] as String,
-      profileImageUrl: json['profileImageUrl'] as String?,
-      teamDisplayName: json['teamDisplayName'] as String?,
-      teamProfileImageUrl: json['teamProfileImageUrl'] as String?,
+      displayName: json['displayName'] as String?,
+      profileImage: json['profileImage'] as String?,
       role: $enumDecode(_$TeamRoleEnumMap, json['role']),
       joinedAt: DateTime.parse(json['joinedAt'] as String),
     );
 
 Map<String, dynamic> _$TeamMemberToJson(TeamMember instance) =>
     <String, dynamic>{
-      'id': instance.id,
+      'memberId': instance.memberId,
+      'userId': instance.userId,
       'agoraId': instance.agoraId,
       'displayName': instance.displayName,
-      'profileImageUrl': instance.profileImageUrl,
-      'teamDisplayName': instance.teamDisplayName,
-      'teamProfileImageUrl': instance.teamProfileImageUrl,
+      'profileImage': instance.profileImage,
       'role': _$TeamRoleEnumMap[instance.role]!,
       'joinedAt': instance.joinedAt.toIso8601String(),
     };
@@ -200,3 +198,43 @@ Map<String, dynamic> _$EventToJson(Event instance) => <String, dynamic>{
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };
+
+TeamInvitation _$TeamInvitationFromJson(Map<String, dynamic> json) =>
+    TeamInvitation(
+      invitationId: (json['invitationId'] as num).toInt(),
+      teamId: (json['teamId'] as num).toInt(),
+      teamName: json['teamName'] as String,
+      teamProfileImage: json['teamProfileImage'] as String?,
+      fromAgoraId: json['fromAgoraId'] as String,
+      fromDisplayName: json['fromDisplayName'] as String?,
+      fromProfileImage: json['fromProfileImage'] as String?,
+      toAgoraId: json['toAgoraId'] as String,
+      toDisplayName: json['toDisplayName'] as String?,
+      toProfileImage: json['toProfileImage'] as String?,
+      status: $enumDecode(_$InvitationStatusEnumMap, json['status']),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+    );
+
+Map<String, dynamic> _$TeamInvitationToJson(TeamInvitation instance) =>
+    <String, dynamic>{
+      'invitationId': instance.invitationId,
+      'teamId': instance.teamId,
+      'teamName': instance.teamName,
+      'teamProfileImage': instance.teamProfileImage,
+      'fromAgoraId': instance.fromAgoraId,
+      'fromDisplayName': instance.fromDisplayName,
+      'fromProfileImage': instance.fromProfileImage,
+      'toAgoraId': instance.toAgoraId,
+      'toDisplayName': instance.toDisplayName,
+      'toProfileImage': instance.toProfileImage,
+      'status': _$InvitationStatusEnumMap[instance.status]!,
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+    };
+
+const _$InvitationStatusEnumMap = {
+  InvitationStatus.pending: 'PENDING',
+  InvitationStatus.accepted: 'ACCEPTED',
+  InvitationStatus.rejected: 'REJECTED',
+};

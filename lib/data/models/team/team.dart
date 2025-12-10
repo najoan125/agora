@@ -61,22 +61,20 @@ class Team {
 /// 팀 멤버 모델
 @JsonSerializable()
 class TeamMember {
-  final String id;
+  final int memberId;
+  final int userId;
   final String agoraId;
-  final String displayName;
-  final String? profileImageUrl;
-  final String? teamDisplayName; // 팀 내 표시명
-  final String? teamProfileImageUrl; // 팀 프로필 이미지
+  final String? displayName;
+  final String? profileImage;
   final TeamRole role;
   final DateTime joinedAt;
 
   const TeamMember({
-    required this.id,
+    required this.memberId,
+    required this.userId,
     required this.agoraId,
-    required this.displayName,
-    this.profileImageUrl,
-    this.teamDisplayName,
-    this.teamProfileImageUrl,
+    this.displayName,
+    this.profileImage,
     required this.role,
     required this.joinedAt,
   });
@@ -85,11 +83,8 @@ class TeamMember {
       _$TeamMemberFromJson(json);
   Map<String, dynamic> toJson() => _$TeamMemberToJson(this);
 
-  /// 표시할 이름 (팀 프로필 우선)
-  String get effectiveDisplayName => teamDisplayName ?? displayName;
-
-  /// 표시할 프로필 이미지 (팀 프로필 우선)
-  String? get effectiveProfileImageUrl => teamProfileImageUrl ?? profileImageUrl;
+  /// 표시할 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get effectiveDisplayName => displayName ?? agoraId;
 
   bool get isAdmin => role == TeamRole.admin;
 }
@@ -281,4 +276,62 @@ class Event {
     final now = DateTime.now();
     return now.isAfter(startTime) && now.isBefore(endTime);
   }
+}
+
+/// 초대 상태
+enum InvitationStatus {
+  @JsonValue('PENDING')
+  pending,
+  @JsonValue('ACCEPTED')
+  accepted,
+  @JsonValue('REJECTED')
+  rejected,
+}
+
+/// 팀 초대 모델
+@JsonSerializable()
+class TeamInvitation {
+  final int invitationId;
+  final int teamId;
+  final String teamName;
+  final String? teamProfileImage;
+  final String fromAgoraId;
+  final String? fromDisplayName;
+  final String? fromProfileImage;
+  final String toAgoraId;
+  final String? toDisplayName;
+  final String? toProfileImage;
+  final InvitationStatus status;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const TeamInvitation({
+    required this.invitationId,
+    required this.teamId,
+    required this.teamName,
+    this.teamProfileImage,
+    required this.fromAgoraId,
+    this.fromDisplayName,
+    this.fromProfileImage,
+    required this.toAgoraId,
+    this.toDisplayName,
+    this.toProfileImage,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory TeamInvitation.fromJson(Map<String, dynamic> json) =>
+      _$TeamInvitationFromJson(json);
+  Map<String, dynamic> toJson() => _$TeamInvitationToJson(this);
+
+  bool get isPending => status == InvitationStatus.pending;
+  bool get isAccepted => status == InvitationStatus.accepted;
+  bool get isRejected => status == InvitationStatus.rejected;
+
+  /// 보낸 사람 표시 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get fromEffectiveDisplayName => fromDisplayName ?? fromAgoraId;
+
+  /// 받는 사람 표시 이름 (displayName이 있으면 사용, 없으면 agoraId)
+  String get toEffectiveDisplayName => toDisplayName ?? toAgoraId;
 }

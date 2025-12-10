@@ -1,22 +1,23 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'add_team_member_screen.dart';
+import '../../../data/services/team_service.dart';
+import '../../../data/services/file_service.dart';
+import '../../../data/models/team/team.dart';
 
-class AddTeamScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>) onTeamAdded;
-
+class AddTeamScreen extends ConsumerStatefulWidget {
   const AddTeamScreen({
     Key? key,
-    required this.onTeamAdded,
   }) : super(key: key);
 
   @override
-  State<AddTeamScreen> createState() => _AddTeamScreenState();
+  ConsumerState<AddTeamScreen> createState() => _AddTeamScreenState();
 }
 
-class _AddTeamScreenState extends State<AddTeamScreen> {
+class _AddTeamScreenState extends ConsumerState<AddTeamScreen> {
   late TextEditingController _teamNameController;
   late TextEditingController _teamDescriptionController;
   
@@ -37,6 +38,8 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
   bool _isImageMode = true;
 
   final List<Map<String, dynamic>> _selectedMembers = [];
+
+  bool _isLoading = false;
 
 
 
@@ -64,7 +67,7 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
     }
   }
 
-  void _addTeam() {
+  Future<void> _addTeam() async {
     if (_teamNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('팀 이름을 입력해주세요')),
@@ -72,22 +75,66 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
       return;
     }
 
-    final newTeam = {
-      'name': _teamNameController.text,
-      'member': '${_selectedMembers.length}명',
-      'icon': _isImageMode ? null : _selectedIcon,
-      'image': _isImageMode ? (_pickedFile?.path ?? _selectedImage) : null,
-      'members': _selectedMembers.map((m) => m['name']).toList(),
-      'description': _teamDescriptionController.text,
-    };
+    setState(() => _isLoading = true);
 
-    widget.onTeamAdded(newTeam);
+    try {
+      final teamService = TeamService();
+      final fileService = FileService();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${_teamNameController.text}을 생성했습니다')),
-    );
+      // 1. 이미지 업로드 (선택한 경우)
+      String? uploadedImageUrl;
+      if (_isImageMode && _pickedFile != null) {
+        final imageResult = await fileService.uploadImage(File(_pickedFile!.path));
+        imageResult.when(
+          success: (fileResponse) => uploadedImageUrl = fileResponse.file.downloadUrl,
+          failure: (_) {}, // 이미지 업로드 실패는 무시
+        );
+      }
 
-    Navigator.pop(context);
+      // 2. 팀 생성 API 호출
+      final teamResult = await teamService.createTeam(
+        name: _teamNameController.text,
+        description: _teamDescriptionController.text.isNotEmpty
+            ? _teamDescriptionController.text
+            : null,
+        profileImage: uploadedImageUrl,
+      );
+
+      Team? createdTeam;
+      teamResult.when(
+        success: (team) => createdTeam = team,
+        failure: (error) => throw Exception(error.displayMessage),
+      );
+
+      // 3. 팀원 초대 (선택된 멤버가 있는 경우)
+      if (createdTeam != null && _selectedMembers.isNotEmpty) {
+        final teamId = createdTeam!.id.toString();
+        for (final member in _selectedMembers) {
+          final agoraId = member['id'] as String?;
+          if (agoraId != null && agoraId.isNotEmpty) {
+            await teamService.inviteMember(teamId, agoraId);
+          }
+        }
+      }
+
+      // 4. 성공 처리
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_teamNameController.text}을 생성했습니다')),
+        );
+        Navigator.pop(context, true); // true 반환하여 목록 새로고침 트리거
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('팀 생성에 실패했습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -431,9 +478,18 @@ class _AddTeamScreenState extends State<AddTeamScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _addTeam,
-                    icon: const Icon(Icons.add),
-                    label: const Text('팀 만들기'),
+                    onPressed: _isLoading ? null : _addTeam,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.add),
+                    label: Text(_isLoading ? '생성 중...' : '팀 만들기'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade400,
                       foregroundColor: Colors.white,

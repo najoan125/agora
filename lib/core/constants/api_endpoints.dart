@@ -105,6 +105,17 @@ class ApiEndpoints {
   static String teamMemberRole(String id, String memberId) =>
       '/api/agora/teams/$id/members/$memberId/role';
 
+  // Team Invitations
+  static String teamInvitations(String teamId) =>
+      '/api/agora/teams/$teamId/invitations';
+  static const String teamInvitationsReceived =
+      '/api/agora/teams/invitations/received';
+  static String teamInvitationAccept(String invitationId) =>
+      '/api/agora/teams/invitations/$invitationId/accept';
+  static String teamInvitationReject(String invitationId) =>
+      '/api/agora/teams/invitations/$invitationId/reject';
+  static String teamChat(String teamId) => '/api/agora/teams/$teamId/chat';
+
   // ============ Team Profile ============
   static const String teamProfile = '/api/agora/team-profile';
   static const String teamProfileImage = '/api/agora/team-profile/image';

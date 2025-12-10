@@ -1,5 +1,6 @@
 // 팀 상세 정보 및 관리 화면
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../chat/screens/team_chat_screen.dart';
 import '../../chat/screens/conversation_screen.dart';
 import 'add_team_member_screen.dart';
@@ -8,26 +9,24 @@ import 'org_chart_screen.dart';
 import 'create_notice_screen.dart';
 import 'notice_list_screen.dart';
 import '../../../data/data_manager.dart';
+import '../../../data/models/team/team.dart';
+import '../../../data/services/team_service.dart';
 
-class TeamDetailScreen extends StatefulWidget {
-  final String teamName;
-  final String teamIcon;
-  final List<String> members;
-  final String? teamImage;
+class TeamDetailScreen extends ConsumerStatefulWidget {
+  final Team team;
 
   const TeamDetailScreen({
     Key? key,
-    required this.teamName,
-    required this.teamIcon,
-    required this.members,
-    this.teamImage,
+    required this.team,
   }) : super(key: key);
 
   @override
-  State<TeamDetailScreen> createState() => _TeamDetailScreenState();
+  ConsumerState<TeamDetailScreen> createState() => _TeamDetailScreenState();
 }
 
-class _TeamDetailScreenState extends State<TeamDetailScreen> {
+class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
+  List<TeamMember> _apiMembers = [];
+  bool _isLoadingMembers = true;
   late List<String> _members;
   Map<String, List<String>> _membersByRole = {};
   List<Map<String, dynamic>> _roleDefinitions = [];
@@ -42,10 +41,37 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _members = List<String>.from(widget.members);
-    _teamName = widget.teamName;
-    _teamNameController = TextEditingController(text: widget.teamName);
+    _members = []; // Initialize with empty list, will be loaded from API
+    _teamName = widget.team.name;
+    _teamNameController = TextEditingController(text: widget.team.name);
+    _loadTeamMembers();
     _refreshRoles();
+  }
+
+  Future<void> _loadTeamMembers() async {
+    final teamService = TeamService();
+    final result = await teamService.getTeamMembers(widget.team.id.toString());
+
+    result.when(
+      success: (members) {
+        if (mounted) {
+          setState(() {
+            _apiMembers = members;
+            _members = members.map((m) => m.effectiveDisplayName).toList();
+            _isLoadingMembers = false;
+            _refreshRoles();
+          });
+        }
+      },
+      failure: (error) {
+        if (mounted) {
+          setState(() => _isLoadingMembers = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('팀원 목록 로드 실패: ${error.displayMessage}')),
+          );
+        }
+      },
+    );
   }
 
   void _refreshRoles() {
@@ -102,21 +128,36 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddTeamMemberScreen(
-          onMembersAdded: (members) {
-            setState(() {
-              for (var member in members) {
-                final memberName = member['name'] as String;
-                if (!_members.contains(memberName)) {
-                  _members.add(memberName);
-                }
+          onMembersAdded: (members) async {
+            final teamService = TeamService();
+            int successCount = 0;
+
+            for (var member in members) {
+              final agoraId = member['id'] as String?;
+              if (agoraId != null) {
+                final result = await teamService.inviteMember(
+                  widget.team.id.toString(),
+                  agoraId,
+                );
+                result.when(
+                  success: (_) => successCount++,
+                  failure: (error) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('초대 실패: ${error.displayMessage}')),
+                      );
+                    }
+                  },
+                );
               }
-              _refreshRoles();
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${members.length}명을 팀원으로 추가했습니다'),
-              ),
-            );
+            }
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${successCount}명에게 초대를 보냈습니다')),
+              );
+              _loadTeamMembers(); // Reload member list
+            }
           },
         ),
       ),
@@ -124,6 +165,12 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
   }
 
   void _removeMember(String memberName) {
+    // Find the member in the API members list
+    final member = _apiMembers.firstWhere(
+      (m) => m.effectiveDisplayName == memberName,
+      orElse: () => _apiMembers.first, // Fallback, should not happen
+    );
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -135,15 +182,31 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _members.remove(memberName);
-                DataManager().removeTeamMember(_teamName, memberName);
-                _refreshRoles();
-              });
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$memberName을(를) 제거했습니다')),
+
+              final teamService = TeamService();
+              final result = await teamService.removeMember(
+                widget.team.id.toString(),
+                member.memberId.toString(),
+              );
+
+              result.when(
+                success: (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$memberName을(를) 제거했습니다')),
+                    );
+                    _loadTeamMembers(); // Reload member list
+                  }
+                },
+                failure: (error) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('제거 실패: ${error.displayMessage}')),
+                    );
+                  }
+                },
               );
             },
             style: ElevatedButton.styleFrom(

@@ -3,6 +3,7 @@ import '../api_client.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/exception/app_exception.dart';
 import '../models/team/team.dart';
+import '../models/chat/chat.dart';
 
 /// 팀 관리 서비스
 class TeamService {
@@ -38,6 +39,7 @@ class TeamService {
   Future<Result<Team>> createTeam({
     required String name,
     String? description,
+    String? profileImage,
   }) async {
     try {
       final response = await _apiClient.post(
@@ -45,6 +47,7 @@ class TeamService {
         data: {
           'name': name,
           if (description != null) 'description': description,
+          if (profileImage != null) 'profileImage': profileImage,
         },
       );
       return Success(Team.fromJson(response.data));
@@ -122,14 +125,14 @@ class TeamService {
     }
   }
 
-  /// 팀 멤버 초대
-  Future<Result<void>> inviteMember(String teamId, String userEmail) async {
+  /// 팀 멤버 초대 (초대 전송)
+  Future<Result<TeamInvitation>> inviteMember(String teamId, String agoraId) async {
     try {
-      await _apiClient.post(
-        ApiEndpoints.teamMembers(teamId),
-        queryParameters: {'userEmail': userEmail},
+      final response = await _apiClient.post(
+        ApiEndpoints.teamInvitations(teamId),
+        data: {'agoraId': agoraId},
       );
-      return const Success(null);
+      return Success(TeamInvitation.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));
@@ -441,6 +444,81 @@ class TeamService {
     try {
       await _apiClient.delete(ApiEndpoints.teamEventById(teamId, eventId));
       return const Success(null);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  // ============ Team Invitations ============
+
+  /// 받은 초대 목록 조회
+  Future<Result<List<TeamInvitation>>> getReceivedInvitations() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.teamInvitationsReceived);
+      final List<dynamic> data = response.data;
+      final invitations = data.map((json) => TeamInvitation.fromJson(json)).toList();
+      return Success(invitations);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 보낸 초대 목록 조회
+  Future<Result<List<TeamInvitation>>> getSentInvitations(String teamId) async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.teamInvitations(teamId));
+      final List<dynamic> data = response.data;
+      final invitations = data.map((json) => TeamInvitation.fromJson(json)).toList();
+      return Success(invitations);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 초대 수락
+  Future<Result<TeamInvitation>> acceptInvitation(String invitationId) async {
+    try {
+      final response = await _apiClient.post(
+        ApiEndpoints.teamInvitationAccept(invitationId),
+      );
+      return Success(TeamInvitation.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 초대 거절
+  Future<Result<TeamInvitation>> rejectInvitation(String invitationId) async {
+    try {
+      final response = await _apiClient.post(
+        ApiEndpoints.teamInvitationReject(invitationId),
+      );
+      return Success(TeamInvitation.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 팀 그룹 채팅 조회
+  Future<Result<Chat>> getTeamChat(String teamId) async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.teamChat(teamId));
+      return Success(Chat.fromJson(response.data));
     } on DioException catch (e) {
       return Failure(e.requestOptions.extra['appException'] as AppException? ??
           AppException.unknown(error: e));

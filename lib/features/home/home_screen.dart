@@ -15,6 +15,7 @@ import '../friends/screens/add_friend_screen.dart';
 import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
 import '../teams/screens/create_team_profile_screen.dart';
+import '../teams/screens/edit_team_profile_screen.dart';
 
 import 'screens/notification_screen.dart';
 import '../chat/screens/create_group_screen.dart';
@@ -831,8 +832,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
-            onTap: () {
-              // 팀 프로필 수정 화면으로 이동 (추후 구현 가능)
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditTeamProfileScreen(
+                    teamProfile: teamProfile,
+                  ),
+                ),
+              );
+              if (result == true && mounted) {
+                ref.invalidate(myTeamProfileProvider);
+              }
             },
             child: Container(
               color: Colors.white,
@@ -1011,11 +1022,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
             context,
             MaterialPageRoute(
               builder: (context) => TeamDetailScreen(
-                teamName: team.name,
-                teamIcon: '🛡️',
-                members: [], // Will be loaded from API
-                teamImage: team.profileImageUrl ??
-                    'https://picsum.photos/seed/${team.name}/200/200',
+                team: team,
               ),
             ),
           );
