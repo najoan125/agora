@@ -142,7 +142,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     );
   }
 
-  void _handleReply(String messageText) {
+  void _handleReply(String messageText, String senderName) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('답장 기능은 준비 중입니다'),

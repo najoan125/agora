@@ -31,6 +31,7 @@ Chat _$ChatFromJson(Map<String, dynamic> json) => Chat(
       lastMessageAt: json['lastMessageTime'] == null
           ? null
           : DateTime.parse(json['lastMessageTime'] as String),
+      lastMessageId: json['lastMessageId'],
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
       isPinned: json['isPinned'] as bool? ?? false,
       folderId: json['folderId'] as String?,
@@ -60,6 +61,7 @@ Map<String, dynamic> _$ChatToJson(Chat instance) => <String, dynamic>{
       'messageCount': instance.messageCount,
       'lastMessageContent': instance.lastMessageContent,
       'lastMessageTime': instance.lastMessageAt?.toIso8601String(),
+      'lastMessageId': instance.lastMessageId,
       'unreadCount': instance.unreadCount,
       'isPinned': instance.isPinned,
       'folderId': instance.folderId,

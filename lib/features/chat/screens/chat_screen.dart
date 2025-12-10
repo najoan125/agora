@@ -550,6 +550,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                 chat: _chatToMap(chat, currentUserId),
                 onTap: () {
                   if (isGroupChat) {
+                    ref.read(currentChatIdProvider.notifier).state = chat.id.toString();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -560,8 +561,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                           members: [], // Will be loaded from participants
                         ),
                       ),
-                    );
+                    ).then((_) {
+                      ref.read(currentChatIdProvider.notifier).state = null;
+                    });
                   } else {
+                    ref.read(currentChatIdProvider.notifier).state = chat.id.toString();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -572,7 +576,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
                           isTeam: false,
                         ),
                       ),
-                    );
+                    ).then((_) {
+                      ref.read(currentChatIdProvider.notifier).state = null;
+                    });
                   }
                 },
               );
@@ -601,16 +607,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with TickerProviderStat
   String _formatTime(DateTime? dateTime) {
     if (dateTime == null) return '';
     final now = DateTime.now();
-    final diff = now.difference(dateTime);
+    final difference = now.difference(dateTime);
 
-    if (diff.inDays > 0) {
-      return '${diff.inDays}일 전';
-    } else if (diff.inHours > 0) {
-      return '${diff.inHours}시간 전';
-    } else if (diff.inMinutes > 0) {
-      return '${diff.inMinutes}분 전';
+    if (difference.inDays == 0 && now.day == dateTime.day) {
+      // 오늘: 오전/오후 HH:mm
+      final hour = dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour;
+      final ampm = dateTime.hour >= 12 ? '오후' : '오전';
+      final minute = dateTime.minute.toString().padLeft(2, '0');
+      // 0시는 12시로 표기 (선택사항)
+      final displayHour = hour == 0 ? 12 : hour;
+      return '$ampm $displayHour:$minute';
+    } else if (difference.inDays < 1 && now.day != dateTime.day) {
+      // 하루 차이인데 날짜가 다르면 '어제'
+      return '어제';
+    } else if (difference.inDays < 7) {
+      // 1주일 이내: 요일? (여기서는 그냥 날짜로 통일하거나 요청에 따름. 요청은 '채팅 시간'이라고 했으므로 날짜 보여줌)
+      // 간단히 월/일
+      return '${dateTime.month}월 ${dateTime.day}일';
     } else {
-      return '방금';
+      // 그 외: YYYY.MM.DD
+      return '${dateTime.year}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.day.toString().padLeft(2, '0')}';
     }
   }
 

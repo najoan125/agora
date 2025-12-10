@@ -14,10 +14,14 @@ import '../friends/screens/add_friend_screen.dart';
 import '../teams/screens/team_detail_screen.dart';
 import '../teams/screens/add_team_screen.dart';
 import '../teams/screens/create_team_profile_screen.dart';
+import '../../data/models/chat/chat.dart';
+import '../chat/widgets/chat_tile.dart';
+import '../../shared/providers/chat_provider.dart';
 
 import 'screens/notification_screen.dart';
 import '../chat/screens/create_group_screen.dart';
 import '../chat/screens/group_chat_screen.dart';
+import '../chat/screens/conversation_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -26,7 +30,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _menuAnimationController;
   final FocusNode _searchFocusNode = FocusNode();
@@ -264,7 +269,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                 'name': profile.displayName,
                 'statusMessage': profile.statusMessage ?? '상태 메시지를 설정하세요',
                 'image': profile.profileImageUrl,
-                'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
+                'avatar': profile.displayName.isNotEmpty
+                    ? profile.displayName[0]
+                    : '?',
               }
             : {
                 'name': '사용자',
@@ -326,20 +333,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                     'message': '',
                                   },
                                   onAccept: () async {
-                                    final notifier = ref.read(friendActionProvider.notifier);
-                                    final success = await notifier.acceptFriendRequest(request.id.toString());
+                                    final notifier =
+                                        ref.read(friendActionProvider.notifier);
+                                    final success =
+                                        await notifier.acceptFriendRequest(
+                                            request.id.toString());
                                     if (success && mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('${request.senderDisplayName}님을 친구로 추가했습니다')),
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                '${request.senderDisplayName}님을 친구로 추가했습니다')),
                                       );
                                     }
                                   },
                                   onDecline: () async {
-                                    final notifier = ref.read(friendActionProvider.notifier);
-                                    final success = await notifier.rejectFriendRequest(request.id.toString());
+                                    final notifier =
+                                        ref.read(friendActionProvider.notifier);
+                                    final success =
+                                        await notifier.rejectFriendRequest(
+                                            request.id.toString());
                                     if (success && mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('${request.senderDisplayName}님의 친구 요청을 거절했습니다')),
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                '${request.senderDisplayName}님의 친구 요청을 거절했습니다')),
                                       );
                                     }
                                   },
@@ -363,10 +382,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                               children: birthdays.map((friend) {
                                 return FriendTile(
                                   friend: _friendToMap(friend),
-                                  onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                  onTap: () =>
+                                      _navigateToProfile(_friendToMap(friend)),
                                   onFavoriteToggle: () async {
-                                    final notifier = ref.read(friendActionProvider.notifier);
-                                    await notifier.toggleFavorite(friend.id, friend.isFavorite);
+                                    final notifier =
+                                        ref.read(friendActionProvider.notifier);
+                                    await notifier.toggleFavorite(
+                                        friend.id, friend.isFavorite);
                                   },
                                 );
                               }).toList(),
@@ -388,15 +410,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                             padding: const EdgeInsets.all(32),
                             child: Column(
                               children: [
-                                const Icon(Icons.people_outline, size: 48, color: AppTheme.textSecondary),
+                                const Icon(Icons.people_outline,
+                                    size: 48, color: AppTheme.textSecondary),
                                 const SizedBox(height: 16),
                                 const Text(
                                   '친구 목록을 불러올 수 없습니다',
-                                  style: TextStyle(color: AppTheme.textSecondary),
+                                  style:
+                                      TextStyle(color: AppTheme.textSecondary),
                                 ),
                                 const SizedBox(height: 8),
                                 TextButton(
-                                  onPressed: () => ref.invalidate(friendListProvider),
+                                  onPressed: () =>
+                                      ref.invalidate(friendListProvider),
                                   child: const Text('다시 시도'),
                                 ),
                               ],
@@ -406,11 +431,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                         data: (friends) {
                           var filteredFriends = friends.where((f) {
                             if (_searchQuery.isEmpty) return true;
-                            return f.displayName.toLowerCase().contains(_searchQuery.toLowerCase());
+                            return f.displayName
+                                .toLowerCase()
+                                .contains(_searchQuery.toLowerCase());
                           }).toList();
 
                           if (_sortOption == 'name') {
-                            filteredFriends.sort((a, b) => a.displayName.compareTo(b.displayName));
+                            filteredFriends.sort((a, b) =>
+                                a.displayName.compareTo(b.displayName));
                           }
 
                           // 친구가 없는 경우
@@ -420,7 +448,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                 padding: const EdgeInsets.all(32),
                                 child: Column(
                                   children: [
-                                    const Icon(Icons.people_outline, size: 48, color: AppTheme.textSecondary),
+                                    const Icon(Icons.people_outline,
+                                        size: 48,
+                                        color: AppTheme.textSecondary),
                                     const SizedBox(height: 16),
                                     const Text(
                                       '아직 친구가 없습니다',
@@ -433,7 +463,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                     const SizedBox(height: 8),
                                     const Text(
                                       '친구를 추가해보세요!',
-                                      style: TextStyle(color: AppTheme.textSecondary),
+                                      style: TextStyle(
+                                          color: AppTheme.textSecondary),
                                     ),
                                   ],
                                 ),
@@ -441,8 +472,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                             );
                           }
 
-                          final favorites = filteredFriends.where((f) => f.isFavorite).toList();
-                          final otherFriends = filteredFriends.where((f) => !f.isFavorite).toList();
+                          final favorites = filteredFriends
+                              .where((f) => f.isFavorite)
+                              .toList();
+                          final otherFriends = filteredFriends
+                              .where((f) => !f.isFavorite)
+                              .toList();
 
                           return Column(
                             children: [
@@ -455,10 +490,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                     children: favorites.map((friend) {
                                       return FriendTile(
                                         friend: _friendToMap(friend),
-                                        onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                        onTap: () => _navigateToProfile(
+                                            _friendToMap(friend)),
                                         onFavoriteToggle: () async {
-                                          final notifier = ref.read(friendActionProvider.notifier);
-                                          await notifier.toggleFavorite(friend.id.toString(), friend.isFavorite);
+                                          final notifier = ref.read(
+                                              friendActionProvider.notifier);
+                                          await notifier.toggleFavorite(
+                                              friend.id.toString(),
+                                              friend.isFavorite);
                                         },
                                       );
                                     }).toList(),
@@ -473,10 +512,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                   children: otherFriends.map((friend) {
                                     return FriendTile(
                                       friend: _friendToMap(friend),
-                                      onTap: () => _navigateToProfile(_friendToMap(friend)),
+                                      onTap: () => _navigateToProfile(
+                                          _friendToMap(friend)),
                                       onFavoriteToggle: () async {
-                                        final notifier = ref.read(friendActionProvider.notifier);
-                                        await notifier.toggleFavorite(friend.id.toString(), friend.isFavorite);
+                                        final notifier = ref.read(
+                                            friendActionProvider.notifier);
+                                        await notifier.toggleFavorite(
+                                            friend.id.toString(),
+                                            friend.isFavorite);
                                       },
                                     );
                                   }).toList(),
@@ -500,6 +543,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
   }
 
   Widget _buildGroupChatsSection() {
+    final chatListAsync = ref.watch(chatListProvider);
+
     return Column(
       children: [
         const Divider(height: 1, thickness: 1, color: Color(0xFFCCCCCC)),
@@ -522,12 +567,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${_groupChats.length}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
+                chatListAsync.when(
+                  data: (chats) {
+                    final groupCount =
+                        chats.where((c) => c.type == ChatType.group).length;
+                    return Text(
+                      '$groupCount',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  error: (_, __) => const Text(
+                    '0',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -543,8 +607,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
         ),
         if (_isGroupChatExpanded)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-            height: 120,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            alignment: Alignment.centerLeft,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -563,13 +627,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                           ),
                         );
 
-                        if (result != null && result is Map<String, dynamic>) {
-                          setState(() {
-                            _groupChats.insert(0, result);
-                          });
+                        if (result != null) {
+                          // 그룹 생성 성공 시 목록 새로고침 (이미 CreateGroupScreen 내부에서 수행되지만 안전장치)
+                          ref.invalidate(chatListProvider);
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('그룹 "${result['name']}" 생성 완료!')),
+                              const SnackBar(content: Text('그룹 생성이 완료되었습니다.')),
                             );
                           }
                         }
@@ -582,7 +645,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                             decoration: BoxDecoration(
                               color: const Color(0xFFF5F5F5),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                              border:
+                                  Border.all(color: const Color(0xFFE0E0E0)),
                             ),
                             child: const Icon(
                               Icons.add,
@@ -604,25 +668,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                     ),
                   ),
                   // Existing Group Chats
-                  ..._groupChats.map((chat) => Padding(
-                    padding: const EdgeInsets.only(right: 20.0),
-                    child: GroupChatTile(
-                      name: chat['name']!,
-                      image: chat['image'],
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => GroupChatScreen(
-                              groupName: chat['name']!,
-                              groupImage: chat['image'],
-                              members: List<String>.from(chat['members'] ?? []),
+                  ...chatListAsync.when(
+                    data: (chats) {
+                      final groupChats =
+                          chats.where((c) => c.type == ChatType.group).toList();
+                      return groupChats.map((chat) => Padding(
+                            padding: const EdgeInsets.only(right: 20.0),
+                            child: GroupChatTile(
+                              name: chat.displayName ?? chat.name ?? '그룹',
+                              image: chat.profileImageUrl ?? chat.displayImage,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ConversationScreen(
+                                      chatId: chat.id.toString(),
+                                      userName: chat.displayName ??
+                                          chat.name ??
+                                          '그룹',
+                                      userImage: chat.profileImageUrl ??
+                                          chat.displayImage ??
+                                          '',
+                                      isTeam: chat.type == ChatType.group,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  )).toList(),
+                          ));
+                    },
+                    loading: () => [const SizedBox.shrink()],
+                    error: (_, __) => [const SizedBox.shrink()],
+                  ),
                 ],
               ),
             ),
@@ -630,6 +707,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
       ],
     );
   }
+
+
 
   Widget _buildTeamList() {
     final teamsAsync = ref.watch(teamListProvider);
@@ -681,7 +760,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                             padding: const EdgeInsets.all(32),
                             child: Column(
                               children: [
-                                const Icon(Icons.groups_outlined, size: 48, color: AppTheme.textSecondary),
+                                const Icon(Icons.groups_outlined,
+                                    size: 48, color: AppTheme.textSecondary),
                                 const SizedBox(height: 16),
                                 const Text(
                                   '가입한 팀이 없습니다',
@@ -694,7 +774,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                 const SizedBox(height: 8),
                                 const Text(
                                   '팀을 만들거나 초대를 받아보세요!',
-                                  style: TextStyle(color: AppTheme.textSecondary),
+                                  style:
+                                      TextStyle(color: AppTheme.textSecondary),
                                 ),
                               ],
                             ),
@@ -705,11 +786,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                           builder: (context) {
                             var filteredTeams = teams.where((t) {
                               if (_searchQuery.isEmpty) return true;
-                              return t.name.toLowerCase().contains(_searchQuery.toLowerCase());
+                              return t.name
+                                  .toLowerCase()
+                                  .contains(_searchQuery.toLowerCase());
                             }).toList();
 
                             if (_sortOption == 'name') {
-                              filteredTeams.sort((a, b) => a.name.compareTo(b.name));
+                              filteredTeams
+                                  .sort((a, b) => a.name.compareTo(b.name));
                             }
 
                             return CollapsibleSection(
@@ -728,7 +812,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                                 );
                               },
                               child: Column(
-                                children: filteredTeams.map((team) => _buildTeamTile(team)).toList(),
+                                children: filteredTeams
+                                    .map((team) => _buildTeamTile(team))
+                                    .toList(),
                               ),
                             );
                           },
@@ -760,7 +846,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
         },
         child: Container(
           color: Colors.white,
-          padding: const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
+          padding:
+              const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
           child: Row(
             children: [
               Container(
@@ -828,7 +915,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                   'name': profile.displayName,
                   'statusMessage': profile.statusMessage ?? '상태 메시지를 설정하세요',
                   'image': profile.profileImageUrl,
-                  'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
+                  'avatar': profile.displayName.isNotEmpty
+                      ? profile.displayName[0]
+                      : '?',
                 }
               : {
                   'name': '사용자',
@@ -863,7 +952,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                     'name': profile.displayName,
                     'statusMessage': '팀: ${team.name}',
                     'image': profile.profileImageUrl,
-                    'avatar': profile.displayName.isNotEmpty ? profile.displayName[0] : '?',
+                    'avatar': profile.displayName.isNotEmpty
+                        ? profile.displayName[0]
+                        : '?',
                   }
                 : {
                     'name': '사용자',
@@ -880,7 +971,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
           // 팀 프로필이 없는 경우 - 생성 버튼 표시
           return Container(
             color: Colors.white,
-            padding: const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
+            padding:
+                const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
             child: Row(
               children: [
                 Container(
@@ -958,7 +1050,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
             },
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.only(top: 20, bottom: 20, left: 24, right: 24),
+              padding: const EdgeInsets.only(
+                  top: 20, bottom: 20, left: 24, right: 24),
               child: Row(
                 children: [
                   Container(
@@ -977,7 +1070,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                     child: teamProfile.profileImageUrl == null
                         ? Center(
                             child: Text(
-                              teamProfile.displayName.isNotEmpty ? teamProfile.displayName[0] : '?',
+                              teamProfile.displayName.isNotEmpty
+                                  ? teamProfile.displayName[0]
+                                  : '?',
                               style: const TextStyle(fontSize: 30),
                             ),
                           )

@@ -5,7 +5,11 @@ import '../../../core/theme.dart';
 import '../../../core/utils/file_download_helper.dart';
 import 'dart:typed_data';
 
-class MessageBubble extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/ai_provider.dart';
+import '../../../data/services/ai_service.dart';
+
+class MessageBubble extends ConsumerStatefulWidget {
   final String message;
   final bool isMe;
   final DateTime time;
@@ -24,10 +28,14 @@ class MessageBubble extends StatefulWidget {
   final List<String> reactions;
   final Function(String) onReactionSelected;
   final Function(String)? onDelete;
-  final Function(String)? onReply;
+  final Function(String message, String senderName)? onReply;
   final Function(String)? onForward;
   final Function(String)? onPin;
   final bool enableOptions;
+  final String? replyToId;
+  final String? replyToSender;
+  final String? replyToContent;
+  final Function(String)? onReplyTap;
 
   const MessageBubble({
     Key? key,
@@ -53,13 +61,17 @@ class MessageBubble extends StatefulWidget {
     this.onForward,
     this.onPin,
     this.enableOptions = true,
+    this.replyToId,
+    this.replyToSender,
+    this.replyToContent,
+    this.onReplyTap,
   }) : super(key: key);
 
   @override
-  State<MessageBubble> createState() => _MessageBubbleState();
+  ConsumerState<MessageBubble> createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble> {
+class _MessageBubbleState extends ConsumerState<MessageBubble> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   Duration _totalDuration = Duration.zero;
@@ -173,7 +185,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                   child: Column(
                     children: [
                       _buildMenuOption(Icons.reply, '답장', () {
-                        widget.onReply?.call(widget.message);
+                        widget.onReply?.call(widget.message, widget.senderName ?? '상대방');
                       }),
                       const Divider(height: 1, color: Color(0xFFE5E5EA)),
                       _buildMenuOption(Icons.forward, '전달', () {
@@ -203,12 +215,40 @@ class _MessageBubbleState extends State<MessageBubble> {
                       }),
                       const Divider(height: 1, color: Color(0xFFE5E5EA)),
                       _buildMenuOption(Icons.translate, _isTranslated ? '원문 보기' : '번역', () {
-                        setState(() {
-                          if (!_isTranslated) {
-                            _translatedText = '[번역됨] ${widget.message}';
-                          }
-                          _isTranslated = !_isTranslated;
-                        });
+                        if (_isTranslated) {
+                          setState(() {
+                            _isTranslated = false;
+                          });
+                        } else {
+                          // 언어 선택 다이얼로그 표시
+                          showDialog(
+                            context: context,
+                            builder: (context) => SimpleDialog(
+                              title: const Text('번역할 언어 선택'),
+                              children: [
+                                '영어',
+                                '한국어',
+                                '일본어',
+                                '중국어',
+                                '스페인어',
+                                '프랑스어',
+                                '독일어'
+                              ].map((lang) => SimpleDialogOption(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _translateTo(lang);
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8.0, horizontal: 24.0),
+                                      child: Text(lang,
+                                          style: const TextStyle(fontSize: 16)),
+                                    ),
+                                  ))
+                                  .toList(),
+                            ),
+                          );
+                        }
                       }),
                     ],
                   ),
@@ -232,6 +272,50 @@ class _MessageBubbleState extends State<MessageBubble> {
         ),
       ),
     );
+  }
+
+  Future<void> _translateTo(String targetLang) async {
+    // 로딩 표시
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('AI가 번역 중입니다...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    try {
+      final aiService = ref.read(aiServiceProvider);
+      
+      final result = await aiService.translateMessage(
+        message: widget.message,
+        targetLanguage: targetLang,
+      );
+
+      result.when(
+        success: (translated) {
+          if (mounted) {
+            setState(() {
+              _translatedText = '[$targetLang 번역] $translated';
+              _isTranslated = true;
+            });
+          }
+        },
+        failure: (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('번역 실패: ${error.displayMessage}')),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('번역 오류: $e')),
+        );
+      }
+    }
   }
 
   void _showDeleteConfirmation(BuildContext context) {
@@ -371,31 +455,130 @@ class _MessageBubbleState extends State<MessageBubble> {
                       ),
                     ),
                   ],
-                  // 메시지 버블
-                  GestureDetector(
-                    onLongPress: widget.enableOptions ? () => _showMessageOptions(context) : null,
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: widget.isMe
-                            ? const Color(0xFF0095F6)
-                            : const Color(0xFFF0F0F0),
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(20),
-                          topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(widget.isMe ? 20 : 4),
-                          bottomRight: Radius.circular(widget.isMe ? 4 : 20),
+
+                  // 메시지 버블 (슬라이드 답장 기능 추가)
+                  Dismissible(
+                    key: ValueKey('dismiss_${widget.message}_${widget.time}'),
+                    direction: DismissDirection.endToStart,
+                    confirmDismiss: (direction) async {
+                      widget.onReply?.call(widget.message, widget.senderName ?? '상대방');
+                      // 실제 삭제가 일어나지 않도록 false 반환
+                      return false;
+                    },
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      color: Colors.transparent,
+                    ),
+                    child: GestureDetector(
+                      onLongPress: widget.enableOptions ? () => _showMessageOptions(context) : null,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 이미지
-                          if (widget.imageBytes != null)
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: widget.isMe
+                              ? const Color(0xFF0095F6)
+                              : const Color(0xFFF0F0F0),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(20),
+                            topRight: const Radius.circular(20),
+                            bottomLeft: Radius.circular(widget.isMe ? 20 : 4),
+                            bottomRight: Radius.circular(widget.isMe ? 4 : 20),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 답장 메시지 표시 (Explicit fields or parsing)
+                            if (widget.replyToId != null && widget.replyToSender != null) ...[
+                               GestureDetector(
+                                onTap: () {
+                                  if (widget.onReplyTap != null && widget.replyToId != null) {
+                                    widget.onReplyTap!(widget.replyToId!);
+                                  }
+                                },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${widget.replyToSender}에게 답장',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: widget.isMe ? Colors.white.withOpacity(0.9) : const Color(0xFF0095F6),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.replyToContent ?? '메시지',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: widget.isMe ? Colors.white.withOpacity(0.7) : Colors.black54,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Divider(
+                                      height: 1, 
+                                      color: widget.isMe ? Colors.white.withOpacity(0.3) : Colors.grey.withOpacity(0.3)
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                ),
+                              ),
+                            ] else if (displayMessage.startsWith('///REPLY///')) ...[
+                              Builder(
+                                builder: (context) {
+                                  // 답장 포맷 파싱: ///REPLY///{name}///{message}///\n{content}
+                                  final parts = displayMessage.split('///');
+                                  if (parts.length >= 4) {
+                                    final replySender = parts[2];
+                                    final replyContent = parts[3];
+                                    
+                                    return GestureDetector(
+                                       // Parsing mode doesn't support ID-based jump easily unless ID is embedded. 
+                                       // Assuming new system uses explicit fields.
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '$replySender에게 답장',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: widget.isMe ? Colors.white.withOpacity(0.9) : const Color(0xFF0095F6),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            replyContent,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: widget.isMe ? Colors.white.withOpacity(0.7) : Colors.black54,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Divider(
+                                            height: 1, 
+                                            color: widget.isMe ? Colors.white.withOpacity(0.3) : Colors.grey.withOpacity(0.3)
+                                          ),
+                                          const SizedBox(height: 8),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ],
+                            // 이미지
+                            if (widget.imageBytes != null)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8.0),
                               child: ClipRRect(
@@ -518,16 +701,43 @@ class _MessageBubbleState extends State<MessageBubble> {
                             ),
                           // 텍스트 메시지
                           if (displayMessage.isNotEmpty && (widget.audioPath == null || displayMessage != '음성 메모'))
-                            Text(
-                              displayMessage,
-                              style: TextStyle(
-                                color: widget.isMe ? Colors.white : Colors.black,
-                                fontSize: 15,
-                              ),
+                          if (displayMessage.isNotEmpty && (widget.audioPath == null || displayMessage != '음성 메모'))
+                            Builder(
+                              builder: (context) {
+                                // 파싱된 메시지 (답장 부분 제외)
+                                String content = displayMessage;
+                                if (content.startsWith('///REPLY///')) {
+                                  final parts = content.split('///');
+                                  if (parts.length >= 5) { // separator 3 times + newline
+                                    // parts[0] is empty, parts[1] is REPLY, parts[2] is name, parts[3] is message, parts[4] starts with \n
+                                     // The content is after the third /// and usually \n
+                                     final index = content.indexOf('\n');
+                                     if(index != -1) {
+                                       content = content.substring(index + 1);
+                                     }
+                                  }
+                                } else if (content.startsWith('↳ 답장: "')) {
+                                   // Backward compatibility
+                                  final RegExp regex = RegExp(r'^↳ 답장: "(.*)"\n(.*)', dotAll: true);
+                                  final match = regex.firstMatch(content);
+                                  if (match != null) {
+                                    content = match.group(2) ?? content;
+                                  }
+                                }
+
+                                return Text(
+                                  content,
+                                  style: TextStyle(
+                                    color: widget.isMe ? Colors.white : Colors.black,
+                                    fontSize: 15,
+                                  ),
+                                );
+                              },
                             ),
                         ],
                       ),
                     ),
+                  ),
                   ),
                   // 시간 표시 (상대방 메시지일 때 오른쪽)
                   if (!widget.isMe) ...[

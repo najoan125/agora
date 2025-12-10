@@ -42,6 +42,8 @@ class Chat {
   final dynamic lastMessageContent;
   @JsonKey(name: 'lastMessageTime')
   final DateTime? lastMessageAt;
+  @JsonKey(name: 'lastMessageId')
+  final dynamic? lastMessageId; // 추가: 마지막 메시지 ID
   @JsonKey(defaultValue: 0)
   final int unreadCount;
   @JsonKey(defaultValue: false)
@@ -68,6 +70,7 @@ class Chat {
     this.messageCount,
     this.lastMessageContent,
     this.lastMessageAt,
+    this.lastMessageId, // 추가
     this.unreadCount = 0,
     this.isPinned = false,
     this.folderId,
@@ -128,6 +131,63 @@ class Chat {
       }
     }
     return displayImage ?? profileImageUrl;
+  }
+
+  /// 계산된 안읽음 개수 (서버에서 반환하는 unreadCount만 사용)
+  int get calculatedUnreadCount {
+    return unreadCount;
+  }
+
+  Chat copyWith({
+    dynamic id,
+    ChatType? type,
+    ChatContext? context,
+    String? displayName,
+    String? displayImage,
+    String? name,
+    String? profileImageUrl,
+    int? teamId,
+    String? teamName,
+    int? participantCount,
+    List<ParticipantProfile>? participants,
+    ParticipantProfile? otherParticipant,
+    int? readCount,
+    bool? readEnabled,
+    int? messageCount,
+    dynamic lastMessageContent,
+    DateTime? lastMessageAt,
+    dynamic? lastMessageId,
+    int? unreadCount,
+    bool? isPinned,
+    String? folderId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Chat(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      context: context ?? this.context,
+      displayName: displayName ?? this.displayName,
+      displayImage: displayImage ?? this.displayImage,
+      name: name ?? this.name,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      teamId: teamId ?? this.teamId,
+      teamName: teamName ?? this.teamName,
+      participantCount: participantCount ?? this.participantCount,
+      participants: participants ?? this.participants,
+      otherParticipant: otherParticipant ?? this.otherParticipant,
+      readCount: readCount ?? this.readCount,
+      readEnabled: readEnabled ?? this.readEnabled,
+      messageCount: messageCount ?? this.messageCount,
+      lastMessageContent: lastMessageContent ?? this.lastMessageContent,
+      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      lastMessageId: lastMessageId ?? this.lastMessageId,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isPinned: isPinned ?? this.isPinned,
+      folderId: folderId ?? this.folderId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 
@@ -199,6 +259,7 @@ class ChatMessage {
     if (value == null) return null;
     return value.toString();
   }
+
   @JsonKey(name: 'senderId')
   final int? senderId;
   final String senderAgoraId;

@@ -236,4 +236,81 @@ class ChatService {
       return Failure(AppException.unknown(error: e));
     }
   }
+
+  // ============ 그룹 채팅 관리 API (Group Chat) ============
+
+  /// 그룹 채팅방 생성
+  ///
+  /// [name] 채팅방 이름
+  /// [memberIds] 초대할 멤버들의 ID (Agora ID 아님, User ID 목록)
+  /// [fileId] 프로필 이미지 파일 ID (선택)
+  Future<Result<Chat>> createGroupChat({
+    required String name,
+    required List<int> memberIds,
+    String? fileId,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        ApiEndpoints.groupChats,
+        data: {
+          'name': name,
+          'memberIds': memberIds,
+          if (fileId != null) 'fileId': fileId,
+        },
+      );
+      print('>>> createGroupChat response: ${response.data}');
+      return Success(Chat.fromJson(response.data));
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 그룹 채팅방 멤버 초대
+  Future<Result<void>> inviteToGroupChat(String chatId, List<int> memberIds) async {
+    try {
+      await _apiClient.post(
+        ApiEndpoints.groupChatMembers(chatId),
+        data: {'memberIds': memberIds},
+      );
+      return const Success(null);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 그룹 채팅방 멤버 강퇴 (방장 권한)
+  Future<Result<void>> removeMemberFromGroupChat(String chatId, String userId) async {
+    try {
+      await _apiClient.delete(
+        ApiEndpoints.groupChatMemberRemove(chatId, userId),
+      );
+      return const Success(null);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
+
+  /// 그룹 채팅방 나가기
+  Future<Result<void>> leaveGroupChat(String chatId) async {
+    try {
+      await _apiClient.delete(
+        ApiEndpoints.groupChatLeave(chatId),
+      );
+      return const Success(null);
+    } on DioException catch (e) {
+      return Failure(e.requestOptions.extra['appException'] as AppException? ??
+          AppException.unknown(error: e));
+    } catch (e) {
+      return Failure(AppException.unknown(error: e));
+    }
+  }
 }
