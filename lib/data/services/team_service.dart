@@ -77,14 +77,17 @@ class TeamService {
     String teamId, {
     String? name,
     String? description,
+    String? profileImage,
   }) async {
     try {
+      final queryParams = <String, dynamic>{};
+      if (name != null) queryParams['name'] = name;
+      if (description != null) queryParams['description'] = description;
+      if (profileImage != null) queryParams['profileImage'] = profileImage;
+
       final response = await _apiClient.put(
         ApiEndpoints.teamById(teamId),
-        data: {
-          if (name != null) 'name': name,
-          if (description != null) 'description': description,
-        },
+        queryParameters: queryParams,
       );
       return Success(Team.fromJson(response.data));
     } on DioException catch (e) {
@@ -268,7 +271,10 @@ class TeamService {
   Future<Result<List<Notice>>> getNotices(String teamId) async {
     try {
       final response = await _apiClient.get(ApiEndpoints.teamNotices(teamId));
-      final List<dynamic> data = response.data['content'] ?? response.data;
+      // API가 배열을 직접 반환
+      final List<dynamic> data = response.data is List
+          ? response.data
+          : (response.data['content'] ?? []);
       final notices = data.map((json) => Notice.fromJson(json)).toList();
       return Success(notices);
     } on DioException catch (e) {

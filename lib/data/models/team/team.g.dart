@@ -100,24 +100,22 @@ Map<String, dynamic> _$TeamProfileToJson(TeamProfile instance) =>
     };
 
 Notice _$NoticeFromJson(Map<String, dynamic> json) => Notice(
-      id: json['id'] as String,
-      teamId: json['teamId'] as String,
+      id: _noticeIdFromJson(json['noticeId']),
+      teamId: _noticeTeamIdFromJson(json['teamId']),
       title: json['title'] as String,
       content: json['content'] as String,
-      authorId: json['authorId'] as String,
-      authorName: json['authorName'] as String,
+      authorId: json['authorEmail'] as String,
       isPinned: json['isPinned'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
 
 Map<String, dynamic> _$NoticeToJson(Notice instance) => <String, dynamic>{
-      'id': instance.id,
+      'noticeId': instance.id,
       'teamId': instance.teamId,
       'title': instance.title,
       'content': instance.content,
-      'authorId': instance.authorId,
-      'authorName': instance.authorName,
+      'authorEmail': instance.authorId,
       'isPinned': instance.isPinned,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),

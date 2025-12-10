@@ -162,15 +162,21 @@ class TeamProfile {
   Map<String, dynamic> toJson() => _$TeamProfileToJson(this);
 }
 
+// Helper functions for Notice
+String _noticeIdFromJson(dynamic value) => value.toString();
+String _noticeTeamIdFromJson(dynamic value) => value.toString();
+
 /// 공지 모델
 @JsonSerializable()
 class Notice {
+  @JsonKey(name: 'noticeId', fromJson: _noticeIdFromJson)
   final String id;
+  @JsonKey(fromJson: _noticeTeamIdFromJson)
   final String teamId;
   final String title;
   final String content;
+  @JsonKey(name: 'authorEmail')
   final String authorId;
-  final String authorName;
   final bool isPinned;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -181,11 +187,13 @@ class Notice {
     required this.title,
     required this.content,
     required this.authorId,
-    required this.authorName,
     this.isPinned = false,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// authorName getter (authorEmail에서 @ 앞부분 추출)
+  String get authorName => authorId.split('@').first;
 
   factory Notice.fromJson(Map<String, dynamic> json) => _$NoticeFromJson(json);
   Map<String, dynamic> toJson() => _$NoticeToJson(this);
