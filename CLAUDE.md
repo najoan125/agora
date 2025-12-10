@@ -1,237 +1,119 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-**Agora** is a Flutter-based multi-platform messenger application supporting Android, iOS, Web, Linux, macOS, and Windows. It's built with Flutter 3.x and Dart SDK 3.0+, using Material Design 3 theming.
+**Agora** - Flutter 기반 멀티플랫폼 메신저 앱 (Android, iOS, Web, Linux, macOS, Windows)
 
-**Current Status:** Early-stage UI framework with 5 main screens, mock data, and basic navigation. Ready for backend integration and state management enhancement.
+- Flutter 3.x / Dart SDK 3.0+
+- Material Design 3
+- Riverpod 상태 관리
+- OAuth 2.0 + PKCE 인증
+- STOMP WebSocket 실시간 채팅
 
-## Architecture
+## API Documentation
 
-### High-Level Structure
+**중요: `docs/agora/api/` 디렉토리에 백엔드 API 문서가 있습니다.**
 
-```
-MyApp (MaterialApp) → Material Design 3 Theme
-    ↓
-LoginScreen (Auth entry point)
-    ↓
-MainScreen (Bottom navigation hub with 3 tabs)
-    ├── HomeScreen (Friends list + Teams list via TabController)
-    ├── ChatScreen (1:1 chats + Team chats via TabController)
-    └── MoreScreen (User profile & settings)
-```
+### API 문서 구조
+| 문서 | 설명 |
+|------|------|
+| `00_OVERVIEW.md` | API 개요, 인증, 공통 응답 형식 |
+| `01_ACCOUNT_API.md` | 계정 관리 |
+| `02_PROFILE_API.md` | 프로필 CRUD |
+| `03_FILE_API.md` | 파일 업로드/다운로드 |
+| `04_FRIEND_API.md` | 친구 관리 |
+| `05_CHAT_API.md` | 1:1 채팅 REST API |
+| `06_WEBSOCKET_API.md` | 실시간 채팅 (STOMP) |
+| `07_GROUP_CHAT_API.md` | 그룹 채팅 |
+| `08_CHAT_FOLDER_API.md` | 채팅 폴더 |
+| `09_NOTIFICATION_API.md` | 알림 & FCM |
+| `10_TEAM_API.md` | 팀 관리 |
+| `11_TEAM_PROFILE_API.md` | 팀 프로필 |
+| `12_TEAM_FEATURES_API.md` | 팀 공지/할일/일정 |
+| `13_SETTINGS_API.md` | 사용자 설정 |
 
-### Key Architectural Characteristics
+### Flow 문서
+- `FLOW_AUTH.md` - OAuth 2.0 인증 흐름
+- `FLOW_ONBOARDING.md` - 회원가입 흐름
+- `FLOW_CHAT.md` - 채팅 흐름
+- `FLOW_FRIEND.md` - 친구 추가 흐름
+- `FLOW_TEAM.md` - 팀 생성 흐름
 
-- **State Management:** Currently using basic `StatefulWidget` with `setState()`. No complex state management framework (GetX, BLoC, Provider, Riverpod) implemented yet.
-- **Navigation:**
-  - Bottom navigation bar in MainScreen for primary tabs
-  - TabController within HomeScreen and ChatScreen for secondary views
-  - Simple MaterialPageRoute-based screen transitions
-- **Data:** All data is currently mock/hardcoded in screen widgets. No backend integration yet.
-- **UI Pattern:** Tab-based views with list displays (friends, teams, chats, settings)
-
-### Screen Components
-
-| Screen | Location | Type | Key Features |
-|--------|----------|------|--------------|
-| **LoginScreen** | `lib/screens/login_screen.dart` | StatefulWidget | Email/password input, password visibility toggle, forgot password link, signup link, loading animation |
-| **MainScreen** | `lib/screens/main_screen.dart` | StatefulWidget | Bottom navigation bar controlling 3 main tabs, navigation state management |
-| **HomeScreen** | `lib/screens/home_screen.dart` | StatefulWidget | TabController managing Friends Tab (online status indicators) and Teams Tab (member counts) |
-| **ChatScreen** | `lib/screens/chat_screen.dart` | StatefulWidget | TabController managing 1:1 Chat Tab (last message preview, unread badges) and Team Chat Tab (last message, unread badges) |
-| **MoreScreen** | `lib/screens/more_screen.dart` | StatelessWidget | User profile info, notification settings, privacy/security toggles, help section, app info, logout |
-
-## Development Commands
-
-### Essential Setup
-```bash
-# Initial setup - ensure Flutter is properly configured
-flutter doctor
-
-# Install dependencies
-flutter pub get
-```
-
-### Running the Application
-```bash
-# Run with hot reload (default)
-flutter run
-
-# Run in release mode (optimized performance)
-flutter run --release
-
-# Run on specific device
-flutter run -d <device_id>
-
-# List available devices/emulators
-flutter devices
-
-# Run on Linux with ATK accessibility warnings suppressed
-GTK_A11Y=none GDK_DEBUG="" flutter run -d linux
-```
-
-**Linux-specific:** If you encounter `Atk-CRITICAL` or cursor theme errors when running on Linux:
-```bash
-# Method 1: Set environment variables before running
-export GTK_A11Y=none
-export GDK_DEBUG=""
-flutter run -d linux
-
-# Method 2: Use the convenience script
-./run_linux.sh
-```
-
-### Code Quality & Analysis
-```bash
-# Analyze code for issues
-flutter analyze
-
-# Format all Dart code
-dart format lib/
-
-# Check for outdated packages
-flutter pub outdated
-
-# Security audit
-dart pub audit
-```
-
-### Building for Distribution
-```bash
-# Android APK
-flutter build apk
-
-# Android App Bundle (Play Store)
-flutter build appbundle
-
-# iOS
-flutter build ios
-
-# Web
-flutter build web
-
-# Desktop (Linux, macOS, Windows)
-flutter build linux
-flutter build macos
-flutter build windows
-```
-
-### Testing
-```bash
-# Run all tests (no test files currently in project)
-flutter test
-
-# Run specific test file
-flutter test test/path/to/test.dart
-
-# Run with coverage
-flutter test --coverage
-```
+### Flutter 구현 가이드
+- `FLUTTER_SETUP.md` - 프로젝트 설정
+- `FLUTTER_AUTH.md` - OAuth 인증 구현
+- `FLUTTER_API_CLIENT.md` - API 클라이언트
+- `FLUTTER_WEBSOCKET.md` - WebSocket 구현
+- `FLUTTER_STATE_MANAGEMENT.md` - Riverpod 상태 관리
+- `FLUTTER_FILE_UPLOAD.md` - 파일 업로드
+- `FLUTTER_FCM.md` - FCM 푸시 알림
 
 ## Project Structure
 
 ```
 lib/
-├── main.dart                    # Entry point, app configuration, theme setup
-└── screens/                     # All screen widgets
-    ├── login_screen.dart
-    ├── main_screen.dart
-    ├── home_screen.dart
-    ├── chat_screen.dart
-    └── more_screen.dart
-
-android/                        # Android native code & gradle config
-ios/                           # iOS native code & Xcode project
-web/                           # Web platform files
-linux/, macos/, windows/       # Desktop platform files
-
-pubspec.yaml                   # Dependencies & project config
-analysis_options.yaml          # Dart analyzer rules
-.metadata                      # Flutter project metadata
+├── main.dart                 # 앱 진입점
+├── core/
+│   ├── constants/           # API endpoints, 상수
+│   ├── exception/           # 앱 예외 처리
+│   ├── utils/               # PKCE, SecureStorage 등
+│   └── theme.dart           # Material 3 테마
+├── data/
+│   ├── api_client.dart      # Dio 기반 API 클라이언트
+│   ├── auth_service.dart    # 인증 서비스
+│   ├── models/              # 데이터 모델 (freezed/json_serializable)
+│   └── services/            # 각 기능별 API 서비스
+├── features/
+│   ├── auth/                # 로그인/회원가입
+│   ├── chat/                # 채팅 화면
+│   ├── friends/             # 친구 목록
+│   ├── home/                # 홈 화면
+│   ├── profile/             # 프로필
+│   ├── settings/            # 설정
+│   └── teams/               # 팀
+├── services/
+│   ├── websocket_service.dart  # STOMP WebSocket
+│   └── oauth_service.dart      # OAuth 2.0 + PKCE
+├── shared/
+│   └── providers/           # Riverpod providers
+└── utils/
 ```
 
-## Key Configuration Files
+## Development Commands
 
-- **`pubspec.yaml`** - Project dependencies, assets, and metadata
-- **`analysis_options.yaml`** - Dart linting rules and analyzer settings
-- **`main.dart`** - App entry point with Material Design 3 theme configuration
+```bash
+# 의존성 설치
+flutter pub get
 
-## Common Development Tasks
+# 코드 생성 (freezed, json_serializable)
+dart run build_runner build --delete-conflicting-outputs
 
-### Adding a New Screen
-1. Create a new file in `lib/screens/` following the naming pattern `feature_screen.dart`
-2. Extend `StatefulWidget` or `StatelessWidget` appropriately
-3. Use Material Design 3 widgets (prefer Material widgets over Cupertino unless targeting iOS primarily)
-4. Add navigation route in `main.dart` if it's a primary screen
-5. Update `MainScreen` bottom navigation if it's a main tab
+# 실행
+flutter run
+flutter run -d linux  # Linux
 
-### Working with Tab Views
-HomeScreen and ChatScreen both use `TabController` for managing multiple tab views. Follow the pattern:
-```dart
-// In initState:
-_tabController = TabController(length: 2, vsync: this);
+# 빌드
+flutter build apk
+flutter build web
 
-// In build:
-TabBar(controller: _tabController, tabs: [...])
-TabBarView(controller: _tabController, children: [...])
+# 코드 품질
+flutter analyze
+dart format lib/
 ```
 
-### Adding Mock Data
-All mock data is currently hardcoded in screen widget bodies. When integrating a backend:
-- Replace mock data lists with state variables
-- Connect to API endpoints
-- Implement error handling and loading states
-- Consider moving to a state management solution (GetX, BLoC, or Provider)
+## Key Technologies
 
-## Dependencies
+| 영역 | 패키지 |
+|------|--------|
+| 상태 관리 | `flutter_riverpod`, `riverpod_annotation` |
+| 네트워킹 | `dio` |
+| 모델 생성 | `freezed`, `json_serializable` |
+| WebSocket | `stomp_dart_client` |
+| 인증 | `flutter_secure_storage`, `app_links` |
+| 알림 | `flutter_local_notifications` |
 
-**Core:**
-- `flutter` (SDK) - Base framework
-- `cupertino_icons: ^1.0.2` - iOS-style icons
+## Configuration
 
-**Development:**
-- `flutter_lints: ^2.0.0` - Dart linting rules
-
-**Note:** No state management, networking, or database packages currently integrated. These should be added based on backend integration requirements.
-
-## Theme & Design
-
-- **Material Design 3:** Fully enabled (`useMaterial3: true`)
-- **Primary Color:** Material Blue swatch
-- **Material 3 Features:** Latest Material Design components and transitions
-
-## Target Platforms & Minimum Requirements
-
-- **Android:** Flutter standard minimum
-- **iOS:** iOS 11.0+
-- **Web:** Modern browsers (Chrome, Firefox, Safari, Edge)
-- **Desktop:** Linux, macOS, Windows (Flutter desktop support)
-
-## Planned Features (from README)
-
-- Real-time chat functionality
-- File sharing
-- Voice/video calls
-- Group chat improvements
-- Chat search
-- Emoji/emoticon support
-- Chat notifications
-- User profile customization
-- Dark mode support
-- Internationalization (i18n)
-
-## Future Enhancements
-
-**Recommended Next Steps:**
-1. Integrate state management solution (GetX recommended for simplicity, or BLoC/Provider for scalability)
-2. Add backend API integration (networking layer)
-3. Implement real-time messaging (WebSocket or Firebase)
-4. Add data persistence (local database)
-5. Implement authentication service
-6. Add push notifications
-7. Implement error handling and logging
-8. Add comprehensive test coverage
-9. Implement dark mode theme
-10. Add internationalization support
+- **API Base URL**: `lib/core/constants/api_endpoints.dart`
+- **OAuth Config**: `lib/core/constants/api_endpoints.dart` (OAuthConfig class)
+- **Theme**: `lib/core/theme.dart`
