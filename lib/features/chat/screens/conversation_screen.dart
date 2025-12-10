@@ -18,6 +18,8 @@ import '../../../shared/providers/chat_provider.dart';
 import '../../../shared/providers/file_provider.dart';
 import '../../../shared/providers/riverpod_profile_provider.dart';
 import '../../../shared/providers/ai_provider.dart';
+import '../../../shared/providers/team_provider.dart';
+import '../../../data/models/team/team.dart';
 import '../../../services/websocket_service.dart';
 import '../../../data/api_client.dart';
 import '../../../data/models/chat/chat.dart';
@@ -509,7 +511,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   }
 
   /// 메시지 목록 빌드
-  Widget _buildMessageList() {
+  Widget _buildMessageList({
+    required bool isTeamChat,
+    required List<TeamMember> teamMembers,
+  }) {
     final messageState = ref.watch(messageListProvider(widget.chatId));
 
     // 로딩 중
@@ -590,13 +595,32 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
           final localMessage =
               _convertToLocalMessage(apiMessage, currentUserId, messages);
 
+          // 팀 채팅인 경우 팀 프로필만 사용 (개인 프로필 X)
+          // 일반 채팅인 경우 API에서 제공하는 프로필 사용
+          String? senderProfileImage;
+          String? senderDisplayName;
+          if (isTeamChat) {
+            // 팀 채팅: 팀 프로필만 사용
+            if (teamMembers.isNotEmpty) {
+              final senderMember = teamMembers
+                  .where((m) => m.agoraId == apiMessage.senderAgoraId)
+                  .firstOrNull;
+              senderProfileImage = senderMember?.profileImage;
+              senderDisplayName = senderMember?.effectiveDisplayName;
+            }
+            // 팀 프로필이 없으면 null (개인 프로필 사용 X)
+          } else {
+            // 일반 채팅: API에서 제공하는 프로필 사용
+            senderProfileImage = apiMessage.senderProfileImage;
+          }
+
           return MessageBubble(
             key: ValueKey(apiMessage.id),
             message: localMessage.text,
             isMe: localMessage.isMe,
             time: localMessage.time,
-            userImage: widget.userImage,
-            senderName: localMessage.sender ?? widget.userName,
+            userImage: senderProfileImage ?? '',
+            senderName: senderDisplayName ?? localMessage.sender ?? widget.userName,
             imageUrl: localMessage.imageUrl,
             fileName: localMessage.fileName,
             fileSize: localMessage.fileSize,
@@ -622,13 +646,55 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     // WebSocket 연결 상태 감지
     final connectionState = ref.watch(webSocketConnectionStateProvider);
 
-    // 내 프로필 이미지 가져오기
+    // 내 프로필 정보 가져오기
     final myProfile = ref.watch(myProfileProvider);
     final myProfileImage = myProfile.when(
       data: (profile) => profile?.profileImageUrl,
       loading: () => null,
       error: (_, __) => null,
     );
+    final myAgoraId = myProfile.when(
+      data: (profile) => profile?.agoraId,
+      loading: () => null,
+      error: (_, __) => null,
+    );
+
+    // 채팅방 참여자 정보 가져오기
+    final chatAsync = ref.watch(chatByIdProvider(widget.chatId));
+    final chat = chatAsync.valueOrNull;
+    final List<ParticipantProfile> participants = chat?.participants ?? [];
+    final bool isTeamChat = chat?.context == ChatContext.team;
+    final teamId = chat?.teamId?.toString();
+
+    // 팀 채팅인 경우 팀 멤버 정보 가져오기
+    final List<TeamMember> teamMembers = (isTeamChat && teamId != null)
+        ? (ref.watch(teamMembersProvider(teamId)).valueOrNull ?? [])
+        : [];
+
+    // 팀 채팅인 경우 나의 팀 프로필 찾기
+    final myTeamMember = isTeamChat && teamMembers.isNotEmpty && myAgoraId != null
+        ? teamMembers.where((m) => m.agoraId == myAgoraId).firstOrNull
+        : null;
+
+    // 나를 제외한 다른 참여자들 (agoraId로 필터링)
+    // 팀 채팅인 경우 팀 멤버 정보 사용, 아닌 경우 participants 사용
+    final List<_DrawerParticipant> otherParticipants = isTeamChat && teamMembers.isNotEmpty
+        ? teamMembers
+            .where((m) => m.agoraId != myAgoraId)
+            .map((m) => _DrawerParticipant(
+                  agoraId: m.agoraId,
+                  displayName: m.effectiveDisplayName,
+                  profileImage: m.profileImage,
+                ))
+            .toList()
+        : participants
+            .where((p) => p.identifier != myAgoraId)
+            .map((p) => _DrawerParticipant(
+                  agoraId: p.identifier,
+                  displayName: p.displayName,
+                  profileImage: p.profileImage,
+                ))
+            .toList();
 
     return Scaffold(
       key: _scaffoldKey,
@@ -769,8 +835,62 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: [
-                          // Current User (Me)
-                          Padding(
+                          // Current User (Me) - 팀 채팅인 경우 팀 프로필만 사용 (개인 프로필 X)
+                          Builder(builder: (context) {
+                            // 팀 채팅이면 팀 프로필, 아니면 개인 프로필
+                            final myDisplayImage = isTeamChat
+                                ? myTeamMember?.profileImage
+                                : myProfileImage;
+                            final myDisplayName = isTeamChat
+                                ? myTeamMember?.effectiveDisplayName
+                                : null;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      shape: BoxShape.circle,
+                                      image: myDisplayImage != null && myDisplayImage.isNotEmpty
+                                          ? DecorationImage(
+                                              image: NetworkImage(myDisplayImage),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                    ),
+                                    child: myDisplayImage == null || myDisplayImage.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              myDisplayName?.isNotEmpty == true
+                                                  ? myDisplayName![0]
+                                                  : '나',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    myDisplayName ?? '나',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          // Other Participants
+                          ...otherParticipants.map((participant) => Padding(
                             padding: const EdgeInsets.only(right: 16),
                             child: Column(
                               children: [
@@ -780,64 +900,45 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.grey[200],
                                     shape: BoxShape.circle,
-                                    image: myProfileImage != null
+                                    image: participant.profileImage != null &&
+                                            participant.profileImage!.isNotEmpty
                                         ? DecorationImage(
-                                            image: NetworkImage(myProfileImage),
+                                            image: NetworkImage(
+                                                participant.profileImage!),
                                             fit: BoxFit.cover,
                                           )
                                         : null,
                                   ),
-                                  child: myProfileImage == null
-                                      ? const Icon(Icons.person,
-                                          color: Colors.grey)
-                                      : null,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  '나',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Other User
-                          Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    shape: BoxShape.circle,
-                                    image: widget.userImage.isNotEmpty
-                                        ? DecorationImage(
-                                            image:
-                                                NetworkImage(widget.userImage),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
-                                  ),
-                                  child: widget.userImage.isEmpty
-                                      ? const Icon(Icons.person,
-                                          color: Colors.grey)
+                                  child: participant.profileImage == null ||
+                                          participant.profileImage!.isEmpty
+                                      ? Center(
+                                          child: Text(
+                                            participant.displayName.isNotEmpty
+                                                ? participant.displayName[0]
+                                                : '?',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        )
                                       : null,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  widget.userName,
+                                  participant.displayName.isNotEmpty
+                                      ? participant.displayName
+                                      : '알 수 없음',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
-                          ),
+                          )),
                           // Invite Button
                           MouseRegion(
                             cursor: SystemMouseCursors.click,
@@ -1207,7 +1308,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               ),
             ),
           Expanded(
-            child: _buildMessageList(),
+            child: _buildMessageList(
+              isTeamChat: isTeamChat,
+              teamMembers: teamMembers,
+            ),
           ),
           _buildInputArea(),
         ],
@@ -3032,4 +3136,17 @@ class _ToneChangeDialogState extends State<_ToneChangeDialog> {
       ],
     );
   }
+}
+
+/// Drawer에서 참여자 표시용 헬퍼 클래스
+class _DrawerParticipant {
+  final String? agoraId;
+  final String displayName;
+  final String? profileImage;
+
+  const _DrawerParticipant({
+    this.agoraId,
+    required this.displayName,
+    this.profileImage,
+  });
 }

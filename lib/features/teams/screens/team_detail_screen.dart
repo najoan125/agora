@@ -78,39 +78,23 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   void _refreshRoles() {
-    _roleDefinitions = DataManager().getRoleDefinitions(_teamName);
-    
-    // Sort roles: specific roles first (by permission count), 'member' last
-    _roleDefinitions.sort((a, b) {
-      if (a['id'] == 'member') return 1;
-      if (b['id'] == 'member') return -1;
-      
-      final permsA = (a['permissions'] as List).length;
-      final permsB = (b['permissions'] as List).length;
-      return permsB.compareTo(permsA); // Descending
-    });
+    // API에서 받은 멤버 데이터를 기반으로 역할별 그룹화
+    _roleDefinitions = [
+      {'id': 'admin', 'name': '관리자', 'permissions': ['all']},
+      {'id': 'member', 'name': '멤버', 'permissions': []},
+    ];
 
-    _membersByRole = {};
-    
-    // Initialize lists for each role
-    for (var roleDef in _roleDefinitions) {
-      _membersByRole[roleDef['id']] = [];
+    _membersByRole = {
+      'admin': [],
+      'member': [],
+    };
+
+    // API 멤버 데이터를 역할별로 그룹화
+    for (var member in _apiMembers) {
+      final roleId = member.role == TeamRole.admin ? 'admin' : 'member';
+      _membersByRole[roleId]!.add(member.effectiveDisplayName);
     }
-    
-    // Group members by role
-    for (var member in _members) {
-      final roleId = DataManager().getTeamRole(_teamName, member);
-      if (_membersByRole.containsKey(roleId)) {
-        _membersByRole[roleId]!.add(member);
-      } else {
-        // Fallback to 'member' or first role if roleId not found
-        final defaultRole = _roleDefinitions.isNotEmpty ? _roleDefinitions.last['id'] : 'member';
-         if (_membersByRole.containsKey(defaultRole)) {
-            _membersByRole[defaultRole]!.add(member);
-         }
-      }
-    }
-    
+
     // Check permissions for current user based on API role
     _checkPermissions();
 
@@ -818,7 +802,18 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
   }
 
   Widget _buildMemberTile(String member, {required String roleName}) {
-    final isMe = member == DataManager().currentUser['name'];
+    // API 멤버 데이터에서 해당 멤버 찾기
+    final apiMember = _apiMembers.where(
+      (m) => m.effectiveDisplayName == member,
+    ).firstOrNull;
+
+    // 현재 유저인지 확인 (프로필의 agoraId와 비교)
+    final profileAsync = ref.read(myProfileProvider);
+    final profile = profileAsync.valueOrNull;
+    final isMe = profile != null && apiMember != null && apiMember.agoraId == profile.agoraId;
+
+    // 프로필 이미지 URL
+    final profileImageUrl = apiMember?.profileImage;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -829,7 +824,7 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withAlpha(5),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -841,14 +836,27 @@ class _TeamDetailScreenState extends ConsumerState<TeamDetailScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
+              color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(12),
-              image: DecorationImage(
-                image: NetworkImage(
-                  DataManager().getMemberImage(member),
-                ),
-                fit: BoxFit.cover,
-              ),
+              image: profileImageUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(profileImageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
+            child: profileImageUrl == null
+                ? Center(
+                    child: Text(
+                      member.isNotEmpty ? member[0] : '?',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
