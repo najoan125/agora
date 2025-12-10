@@ -310,7 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       const SizedBox(height: 10),
 
                       // Group Chats Section
-                      _buildGroupChatsSection(),
+                      // _buildGroupChatsSection(),
 
                       // Friend Requests
                       requestsAsync.when(
