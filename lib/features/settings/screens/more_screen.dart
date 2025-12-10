@@ -378,17 +378,16 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              // Navigator를 미리 저장 (dialog context가 무효화되기 전에)
+              final navigator = Navigator.of(context, rootNavigator: true);
+              navigator.pop(); // dialog 닫기
 
               // 로그아웃 처리
               final notifier = ref.read(authProvider.notifier);
               await notifier.logout();
 
-              if (!mounted) return;
-
               // 로그인 화면으로 이동
-              Navigator.pushNamedAndRemoveUntil(
-                context,
+              navigator.pushNamedAndRemoveUntil(
                 '/',
                 (route) => false,
               );

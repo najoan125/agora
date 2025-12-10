@@ -139,6 +139,15 @@ class OAuthService {
       return;
     }
 
+    // 이미 처리 완료된 경우 무시 (동시 호출 방지)
+    if (_authCompleter == null || _authCompleter!.isCompleted) {
+      return;
+    }
+
+    // completer를 가져오고 즉시 null로 설정 (중복 처리 방지)
+    final completer = _authCompleter!;
+    _authCompleter = null;
+
     // 인앱 브라우저 닫기
     closeInAppWebView();
 
@@ -146,7 +155,7 @@ class OAuthService {
     final error = uri.queryParameters['error'];
     if (error != null) {
       final errorDescription = uri.queryParameters['error_description'] ?? '인증이 취소되었습니다.';
-      _authCompleter?.completeError(
+      completer.completeError(
         AppException.oauth(
           message: error,
           userMessage: errorDescription,
@@ -160,7 +169,7 @@ class OAuthService {
     final state = uri.queryParameters['state'];
 
     if (code == null) {
-      _authCompleter?.completeError(
+      completer.completeError(
         AppException.oauth(
           message: 'No authorization code',
           userMessage: '인증 코드를 받지 못했습니다.',
@@ -172,7 +181,7 @@ class OAuthService {
     // State 검증 (CSRF 방지)
     final savedState = await SecureStorageManager.getOAuthState();
     if (state != savedState) {
-      _authCompleter?.completeError(
+      completer.completeError(
         AppException.oauth(
           message: 'State mismatch',
           userMessage: '보안 검증에 실패했습니다. 다시 시도해주세요.',
@@ -184,9 +193,9 @@ class OAuthService {
     // 토큰 교환
     try {
       final result = await exchangeCodeForToken(code);
-      _authCompleter?.complete(result);
+      completer.complete(result);
     } catch (e) {
-      _authCompleter?.completeError(e);
+      completer.completeError(e);
     }
   }
 
