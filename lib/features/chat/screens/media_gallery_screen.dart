@@ -5,12 +5,14 @@ import '../models/chat_message.dart';
 
 // Helper class to represent individual images with metadata
 class _ImageItem {
-  final Uint8List imageBytes;
+  final Uint8List? imageBytes;
+  final String? imageUrl;
   final DateTime time;
   final int imageIndex; // Index within the message's imageBytesList
   
   _ImageItem({
-    required this.imageBytes,
+    this.imageBytes,
+    this.imageUrl,
     required this.time,
     this.imageIndex = 0,
   });
@@ -105,40 +107,25 @@ class MediaGalleryScreen extends StatelessWidget {
           time: message.time,
         ));
       }
+      // Handle network image
+      else if (message.imageUrl != null && message.imageUrl!.isNotEmpty) {
+        grouped[date]!.add(_ImageItem(
+          imageUrl: message.imageUrl!,
+          time: message.time,
+        ));
+      }
     }
     
     return grouped;
   }
 
   Widget _buildMediaTab(BuildContext context) {
-    // Collect all images from both imageBytes and imageBytesList
-    final List<_ImageItem> allImages = [];
+    final groupedImages = _groupImagesByDate(messages);
     
-    for (var message in messages) {
-      // Handle imageBytesList (multiple images)
-      if (message.imageBytesList != null && message.imageBytesList!.isNotEmpty) {
-        for (int i = 0; i < message.imageBytesList!.length; i++) {
-          allImages.add(_ImageItem(
-            imageBytes: message.imageBytesList![i],
-            time: message.time,
-            imageIndex: i,
-          ));
-        }
-      }
-      // Handle single imageBytes (backward compatibility)
-      else if (message.imageBytes != null) {
-        allImages.add(_ImageItem(
-          imageBytes: message.imageBytes!,
-          time: message.time,
-        ));
-      }
-    }
-
-    if (allImages.isEmpty) {
+    if (groupedImages.isEmpty) {
       return const Center(child: Text('사진/동영상이 없습니다.', style: TextStyle(color: Colors.black)));
     }
 
-    final groupedImages = _groupImagesByDate(messages);
     final sortedDates = groupedImages.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return CustomScrollView(
@@ -170,11 +157,8 @@ class MediaGalleryScreen extends StatelessWidget {
                 (context, index) {
                   final imageItem = groupedImages[date]![index];
                   return GestureDetector(
-                    onTap: () => _openFullScreenImageBytes(context, imageItem.imageBytes),
-                    child: Image.memory(
-                      imageItem.imageBytes,
-                      fit: BoxFit.cover,
-                    ),
+                    onTap: () => _openFullScreenImageItem(context, imageItem),
+                    child: _buildThumbnail(imageItem),
                   );
                 },
                 childCount: groupedImages[date]!.length,
@@ -185,23 +169,26 @@ class MediaGalleryScreen extends StatelessWidget {
       ],
     );
   }
-
-  void _openFullScreenImage(BuildContext context, ChatMessage message) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-          backgroundColor: Colors.black,
-          body: Center(
-            child: Image.memory(message.imageBytes!),
-          ),
-        ),
-      ),
-    );
+  
+  Widget _buildThumbnail(_ImageItem item) {
+    if (item.imageBytes != null) {
+      return Image.memory(
+        item.imageBytes!,
+        fit: BoxFit.cover,
+      );
+    } else if (item.imageUrl != null) {
+      return Image.network(
+        item.imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(color: Colors.grey[300], child: const Icon(Icons.broken_image));
+        },
+      );
+    }
+    return Container(color: Colors.grey[300]);
   }
 
-  void _openFullScreenImageBytes(BuildContext context, Uint8List imageBytes) {
+  void _openFullScreenImageItem(BuildContext context, _ImageItem item) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -209,7 +196,9 @@ class MediaGalleryScreen extends StatelessWidget {
           appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
           backgroundColor: Colors.black,
           body: Center(
-            child: Image.memory(imageBytes),
+            child: item.imageBytes != null
+                ? Image.memory(item.imageBytes!)
+                : Image.network(item.imageUrl!),
           ),
         ),
       ),
@@ -217,7 +206,9 @@ class MediaGalleryScreen extends StatelessWidget {
   }
 
   Widget _buildFileTab() {
-    final fileMessages = messages.where((m) => m.fileName != null).toList();
+    final fileMessages = messages.where((m) => 
+      m.fileName != null || (m.filesList != null && m.filesList!.isNotEmpty)
+    ).toList();
     fileMessages.sort((a, b) => b.time.compareTo(a.time));
 
     if (fileMessages.isEmpty) {
@@ -231,7 +222,7 @@ class MediaGalleryScreen extends StatelessWidget {
       itemCount: sortedDates.length,
       itemBuilder: (context, index) {
         final date = sortedDates[index];
-        final files = groupedFiles[date]!;
+        final msgs = groupedFiles[date]!;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,18 +238,33 @@ class MediaGalleryScreen extends StatelessWidget {
                 ),
               ),
             ),
-            ...files.map((message) => ListTile(
-                  leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
-                  title: Text(message.fileName!, style: const TextStyle(color: Colors.black)),
-                  subtitle: message.fileSize != null
-                      ? Text('${(message.fileSize! / 1024).toStringAsFixed(1)} KB', style: const TextStyle(color: Colors.grey))
-                      : null,
-                  trailing: const Icon(Icons.download, size: 20, color: Colors.grey),
-                  onTap: () {},
-                )),
+            ...msgs.expand((message) {
+              if (message.filesList != null && message.filesList!.isNotEmpty) {
+                 return message.filesList!.map((fileInfo) {
+                   final name = fileInfo['name'] as String? ?? 'Unknown File';
+                   final size = fileInfo['size'] as int?;
+                   return _buildFileTile(name, size);
+                 });
+              } else if (message.fileName != null) {
+                return [_buildFileTile(message.fileName!, message.fileSize)];
+              }
+              return <Widget>[];
+            }),
           ],
         );
       },
+    );
+  }
+  
+  Widget _buildFileTile(String name, int? size) {
+    return ListTile(
+      leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
+      title: Text(name, style: const TextStyle(color: Colors.black)),
+      subtitle: size != null
+          ? Text('${(size / 1024).toStringAsFixed(1)} KB', style: const TextStyle(color: Colors.grey))
+          : null,
+      trailing: const Icon(Icons.download, size: 20, color: Colors.grey),
+      onTap: () {},
     );
   }
 

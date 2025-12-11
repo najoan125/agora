@@ -515,6 +515,13 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
 
 
 
+  /// 로컬 메시지 추가 (Optimistic UI 또는 Mocking용)
+  void addLocalMessage(ChatMessage message) {
+    state = state.copyWith(
+      messages: [message, ...state.messages],
+    );
+  }
+
   @override
 
   void dispose() {
