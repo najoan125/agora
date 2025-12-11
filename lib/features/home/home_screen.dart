@@ -1035,8 +1035,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Row(
         children: [
           Container(
-            width: 70,
-            height: 70,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
               shape: BoxShape.circle,
@@ -1044,11 +1044,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             child: Icon(
               Icons.person_add,
-              size: 35,
+              size: 30,
               color: Colors.grey.shade400,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1056,18 +1056,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Text(
                   '팀 프로필을 만들어보세요',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 4),
                 Text(
                   '팀원들에게 보여질 프로필입니다',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: AppTheme.textSecondary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

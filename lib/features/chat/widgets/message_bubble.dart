@@ -393,6 +393,21 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         ? _translatedText!
         : widget.message;
 
+    // 빈 메시지 체크 (텍스트, 이미지, 파일, 오디오 모두 없는 경우 렌더링 하지 않음)
+    final bool hasText = displayMessage.trim().isNotEmpty && (widget.audioPath == null || displayMessage != '음성 메모');
+    final bool hasImages = (widget.imageBytesList != null && widget.imageBytesList!.isNotEmpty) ||
+                           (widget.imageBytes != null) ||
+                           (widget.imageUrl != null);
+    final bool hasFiles = (widget.filesList != null && widget.filesList!.isNotEmpty) ||
+                          (widget.fileName != null);
+    final bool hasAudio = widget.audioPath != null;
+    final bool hasReply = widget.replyToId != null; 
+
+    // 모든 컨텐츠가 없고 답장도 아니면 빈 공간 반환 (Ghost Message 방지)
+    if (!hasText && !hasImages && !hasFiles && !hasAudio && !hasReply) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -492,7 +507,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 답장 메시지 표시 (Explicit fields or parsing)
+                            // 답장 메시지 표시
                             if (widget.replyToId != null && widget.replyToSender != null) ...[
                                GestureDetector(
                                 onTap: () {
@@ -506,25 +521,25 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                                     Text(
                                       '${widget.replyToSender}에게 답장',
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
-                                        color: widget.isMe ? Colors.white.withOpacity(0.9) : const Color(0xFF0095F6),
+                                        color: widget.isMe ? Colors.white : const Color(0xFF0095F6),
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: 4),
                                     Text(
                                       widget.replyToContent ?? '메시지',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 12,
-                                        color: widget.isMe ? Colors.white.withOpacity(0.7) : Colors.black54,
+                                        fontSize: 13,
+                                        color: widget.isMe ? Colors.white.withOpacity(0.8) : Colors.black87,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 8),
                                     Divider(
                                       height: 1, 
-                                      color: widget.isMe ? Colors.white.withOpacity(0.3) : Colors.grey.withOpacity(0.3)
+                                      color: widget.isMe ? Colors.white.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
                                     ),
                                     const SizedBox(height: 8),
                                   ],
@@ -577,35 +592,107 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                                 },
                               ),
                             ],
-                            // 이미지
-                            if (widget.imageBytes != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.memory(
-                                  widget.imageBytes!,
-                                  width: 200,
-                                  fit: BoxFit.cover,
+                            // 이미지 목록 (로컬 다중 선택)
+                            if (widget.imageBytesList != null && widget.imageBytesList!.isNotEmpty)
+                              ...widget.imageBytesList!.map((bytes) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.memory(
+                                        bytes,
+                                        width: 200,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  )),
+                            
+                            // 단일 이미지 (로컬 - Legacy support)
+                            if (widget.imageBytesList == null && widget.imageBytes != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.memory(
+                                    widget.imageBytes!,
+                                    width: 200,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ),
-                          if (widget.imageUrl != null)
-                             Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  widget.imageUrl!,
-                                  width: 200,
-                                  fit: BoxFit.cover,
+
+                            // 네트워크 이미지
+                            if (widget.imageUrl != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    widget.imageUrl!,
+                                    width: 200,
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ),
-                          // 파일
-                          if (widget.fileName != null)
+                          // 파일 목록 (다중 파일)
+                          if (widget.filesList != null && widget.filesList!.isNotEmpty)
+                            ...widget.filesList!.map((fileInfo) {
+                              final name = fileInfo['name'] as String? ?? 'Unknown File';
+                              final size = fileInfo['size'] as int?;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue[100],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(Icons.insert_drive_file,
+                                            color: Colors.blue, size: 24),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (size != null)
+                                              Text(
+                                                '${(size / 1024).toStringAsFixed(1)} KB',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+
+                          // 단일 파일 (Legacy)
+                          if ((widget.filesList == null || widget.filesList!.isEmpty) && widget.fileName != null)
                             GestureDetector(
-                              onTap: () {
+                               onTap: () {
                                 if (widget.fileBytes != null || widget.filePath != null) {
                                   FileDownloadHelper.downloadFile(
                                     fileBytes: widget.fileBytes ?? Uint8List(0),

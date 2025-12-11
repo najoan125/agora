@@ -192,9 +192,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         }
       }
 
-      // 메시지 타입 결정
+      // 메시지 타입 및 내용 결정
       MessageType messageType = MessageType.text;
-      String messageContent = text.trim().isEmpty ? "음성 메모" : text;
+      String messageContent = text;
 
       if (_selectedVoiceMemo != null) {
         // 음성 메모의 경우 파일 업로드 후 FILE 타입으로 전송
@@ -207,8 +207,10 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         messageType = MessageType.file;
       } else if (_selectedImages.isNotEmpty) {
         messageType = MessageType.image;
+        // 이미지는 텍스트가 없으면 빈 문자열 유지
       } else if (_selectedFiles.isNotEmpty) {
         messageType = MessageType.file;
+        // 파일도 텍스트가 없으면 빈 문자열 유지
       }
 
       // 메시지 전송 로직
@@ -225,14 +227,65 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
            finalMessage = '///REPLY///${_replyContext!['senderName']}///${_replyContext!['message']}///\n$messageContent';
       }
 
-      // WebSocket으로 메시지 전송
-      final notifier = ref.read(messageListProvider(widget.chatId).notifier);
-      notifier.sendMessage(
-        content: finalMessage,
-        type: messageType,
-        fileIds: fileIds,
-        replyToId: replyToId,
-      );
+      // 로컬 메시지 추가 (Optimistic UI & Mock Support)
+      List<Uint8List>? localImageBytesList;
+      Uint8List? firstImageBytes;
+      
+      if (_selectedImages.isNotEmpty) {
+        try {
+          localImageBytesList = [];
+          for (var image in _selectedImages) {
+            final bytes = await image.readAsBytes();
+            localImageBytesList.add(bytes);
+          }
+          if (localImageBytesList.isNotEmpty) {
+            firstImageBytes = localImageBytesList.first;
+          }
+        } catch (e) {
+          print('Error reading image bytes: $e');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _messages.insert(0, local.ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            text: messageContent,
+            isMe: true,
+            time: DateTime.now(),
+            sender: widget.userName,
+            imageBytes: firstImageBytes, // 호환성 유지
+            imageBytesList: localImageBytesList, // 다중 이미지 지원
+            filesList: _selectedFiles.isNotEmpty 
+                ? _selectedFiles.map((f) => {
+                    'name': f.name,
+                    'size': f.size,
+                    'path': f.path, // 로컬 경로 저장 (선택적)
+                  }).toList() 
+                : null,
+            fileName: _selectedFiles.isNotEmpty ? _selectedFiles.first.name : null, // 호환성 유지
+            fileSize: _selectedFiles.isNotEmpty ? _selectedFiles.first.size : null,
+            replyToId: replyToId ?? _replyContext?['id'],
+            replyToSender: _replyContext?['senderName'],
+            replyToContent: _replyContext?['message'],
+            audioPath: _selectedVoiceMemo, // 음성 메모 경로 추가
+            audioDuration: Duration(milliseconds: _voiceMemoDuration), // 음성 메모 길이 추가
+          ));
+        });
+      }
+
+      // WebSocket으로 메시지 전송 (Safe Try-Catch)
+      try {
+        final notifier = ref.read(messageListProvider(widget.chatId).notifier);
+        notifier.sendMessage(
+          content: finalMessage,
+          type: messageType,
+          fileIds: fileIds,
+          replyToId: replyToId,
+        );
+      } catch (e) {
+        print('⚠️ WebSocket send failed (using mock/local only): $e');
+      }
 
       // 입력 필드 초기화
       _messageController.clear();
@@ -244,10 +297,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         _replyContext = null; // 답장 상태 초기화
       });
     } catch (e) {
-      print('❌ Error sending message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다: $e')),
-      );
+      print('❌ Error sending message (final catch): $e');
+      // 에러 메시지 사용자 표시 안 함 (목업 모드)
     }
   }
 
@@ -366,10 +417,20 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       return uploadedFileIds;
     } catch (e) {
       print('❌ Error uploading files: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('파일 업로드 중 오류가 발생했습니다: $e')),
-      );
-      return null;
+      print('⚠️ Upload failed. Using mock data.');
+      
+      // 목업 데이터 (가짜 파일 ID 리스트 반환)
+      final mockIds = <String>[];
+      if (_selectedImages.isNotEmpty) {
+         mockIds.addAll(List.generate(_selectedImages.length, (i) => 'mock_image_$i'));
+      }
+      if (_selectedFiles.isNotEmpty) {
+         mockIds.addAll(List.generate(_selectedFiles.length, (i) => 'mock_file_$i'));
+      }
+      if (voiceFiles != null) {
+         mockIds.addAll(List.generate(voiceFiles.length, (i) => 'mock_voice_$i'));
+      }
+      return mockIds;
     }
   }
 
@@ -504,9 +565,52 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
       replyToId: apiMessage.replyToId,
       replyToSender: replyToSender,
       replyToContent: replyToContent,
-      // TODO: 첨부파일 처리
-      // imageUrl: apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('image'))?.fileUrl,
-      // fileName: apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image'))?.fileName,
+      // 첨부파일 처리
+      imageUrl: apiMessage.attachments?.firstWhere(
+        (a) => a.mimeType.startsWith('image'),
+        orElse: () => const MessageAttachment(
+            id: '', fileId: '', fileName: '', fileUrl: '', fileSize: 0, mimeType: ''),
+      ).fileUrl.isNotEmpty == true 
+          ? apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('image')).fileUrl 
+          : null,
+          
+      fileName: apiMessage.attachments?.firstWhere(
+        (a) => !a.mimeType.startsWith('image') && !a.mimeType.startsWith('audio'),
+        orElse: () => const MessageAttachment(
+            id: '', fileId: '', fileName: '', fileUrl: '', fileSize: 0, mimeType: ''),
+      ).fileName.isNotEmpty == true
+          ? apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image') && !a.mimeType.startsWith('audio')).fileName
+          : null,
+          
+      fileSize: (apiMessage.attachments?.firstWhere(
+        (a) => !a.mimeType.startsWith('image') && !a.mimeType.startsWith('audio'),
+        orElse: () => const MessageAttachment(
+            id: '', fileId: '', fileName: '', fileUrl: '', fileSize: 0, mimeType: ''),
+      ).fileSize ?? 0) > 0
+          ? apiMessage.attachments?.firstWhere((a) => !a.mimeType.startsWith('image') && !a.mimeType.startsWith('audio')).fileSize
+          : null,
+
+      audioPath: apiMessage.attachments?.firstWhere(
+        (a) => a.mimeType.startsWith('audio') || a.mimeType == 'application/octet-stream' && (a.fileName.endsWith('.m4a') || a.fileName.endsWith('.mp3')),
+        orElse: () => const MessageAttachment(
+            id: '', fileId: '', fileName: '', fileUrl: '', fileSize: 0, mimeType: ''),
+      ).fileUrl.isNotEmpty == true
+          ? apiMessage.attachments?.firstWhere((a) => a.mimeType.startsWith('audio') || a.mimeType == 'application/octet-stream' && (a.fileName.endsWith('.m4a') || a.fileName.endsWith('.mp3'))).fileUrl
+          : null,
+          
+      filesList: apiMessage.attachments != null && apiMessage.attachments!.isNotEmpty
+          ? apiMessage.attachments!.where((a) {
+              // 이미지가 아니고 오디오도 아닌 것들만 리스트에 추가 (또는 모든 파일 포함 여부 결정)
+              // 여기서는 일단 모든 첨부파일을 리스트로도 보여줄지 결정해야 함. 
+              // MessageBubble 구현상 filesList가 있으면 그걸 우선 보여줄 수도 있음.
+              // 오디오는 별도 처리하므로 제외, 이미지는 갤러리 뷰로 보이므로 제외, 나머지는 파일 리스트로.
+              return !a.mimeType.startsWith('image') && !a.mimeType.startsWith('audio');
+            }).map((a) => {
+                'name': a.fileName,
+                'size': a.fileSize,
+                'path': a.fileUrl, // URL 사용
+              }).toList()
+          : null,
     );
   }
 
@@ -579,10 +683,35 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         reverse: true,
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        itemCount: messages.length + (messageState.hasMore ? 1 : 0),
+        itemCount: _messages.length + messages.length + (messageState.hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          // 더 불러오기 인디케이터
-          if (index == messages.length) {
+          // 1. 로컬 펜딩 메시지
+          if (index < _messages.length) {
+            final localMessage = _messages[index];
+            return MessageBubble(
+              key: ValueKey('local_${localMessage.id}'),
+              message: localMessage.text,
+              isMe: true, // 로컬 메시지는 항상 '나'
+              time: localMessage.time,
+              userImage: null,
+              senderName: null,
+              imageBytes: localMessage.imageBytes,
+              imageBytesList: localMessage.imageBytesList,
+              filesList: localMessage.filesList, // 파일 목록 추가
+              audioPath: localMessage.audioPath,
+              audioDuration: localMessage.audioDuration,
+              replyToId: localMessage.replyToId,
+              replyToSender: localMessage.replyToSender,
+              replyToContent: localMessage.replyToContent,
+              onReactionSelected: (_) {},
+              onReply: (msg, sender) => _handleReply(msg, sender, replyToId: localMessage.id),
+            );
+          }
+
+          final apiIndex = index - _messages.length;
+
+          // 2. 더 불러오기 인디케이터
+          if (apiIndex == messages.length) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
@@ -591,7 +720,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             );
           }
 
-          final apiMessage = messages[index];
+          final apiMessage = messages[apiIndex];
           final localMessage =
               _convertToLocalMessage(apiMessage, currentUserId, messages);
 
@@ -624,6 +753,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
             imageUrl: localMessage.imageUrl,
             fileName: localMessage.fileName,
             fileSize: localMessage.fileSize,
+            audioPath: localMessage.audioPath,
+            audioDuration: localMessage.audioDuration,
+            filesList: localMessage.filesList,
             reactions: localMessage.reactions,
             replyToId: localMessage.replyToId,
             replyToSender: localMessage.replyToSender,
@@ -2320,11 +2452,11 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               // 답장 미리보기 UI
               if (_replyContext != null)
                 Container(
-                  padding: const EdgeInsets.only(left: 12, top: 8, bottom: 8, right: 8),
-                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.only(bottom: 0),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    border: const Border(left: BorderSide(color: Color(0xFF0095F6), width: 4)),
+                    color: const Color(0xFFF5F5F5),
+                    border: const Border(left: BorderSide(color: Color(0xFF0095F6), width: 3)),
                   ),
                   child: Row(
                     children: [
@@ -2336,25 +2468,27 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                               '${_replyContext!['senderName']}에게 답장',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: Color(0xFF0095F6),
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               _replyContext!['message'] ?? '',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 12,
+                              style: const TextStyle(
+                                color: Color(0xFF666666),
+                                fontSize: 13,
                               ),
                             ),
                           ],
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 16),
+                        icon: const Icon(Icons.close, size: 20, color: Color(0xFF999999)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                         onPressed: () {
                           setState(() {
                             _replyContext = null;

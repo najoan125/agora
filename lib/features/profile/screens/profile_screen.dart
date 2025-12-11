@@ -8,6 +8,7 @@ import '../../chat/screens/conversation_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../settings/screens/more_screen.dart';
 import '../../../shared/providers/chat_provider.dart';
+import '../../../shared/providers/friend_provider.dart';
 import '../../../shared/providers/riverpod_profile_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -55,11 +56,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 color: _isFavorite ? AppTheme.favoriteColor : AppTheme.textSecondary,
                 size: 28,
               ),
-              onPressed: () {
+              onPressed: () async {
+                final newState = !_isFavorite;
                 setState(() {
-                  _isFavorite = !_isFavorite;
-                  _dataManager.toggleFavorite(widget.user['name']);
+                  _isFavorite = newState;
                 });
+                
+                final id = widget.user['id']?.toString();
+                if (id != null) {
+                   await ref.read(friendActionProvider.notifier).toggleFavorite(id, !newState);
+                }
               },
             ),
 
@@ -76,13 +82,93 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _buildInfoSection(),
             if (!_isCurrentUser) ...[
               const SizedBox(height: 24),
+              // 친구 삭제 버튼
               TextButton(
-                onPressed: () {
-                  _dataManager.blockUser(widget.user['name']);
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('사용자가 차단되었습니다.')),
+                onPressed: () async {
+                  final shouldDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('친구 삭제'),
+                      content: Text('${widget.user['name']}님을 친구 목록에서 삭제하시겠습니까?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('삭제', style: TextStyle(color: AppTheme.errorColor)),
+                        ),
+                      ],
+                    ),
                   );
+
+                  if (shouldDelete == true) {
+                    final notifier = ref.read(friendActionProvider.notifier);
+                    // ID가 없으면 에러 처리
+                    final id = widget.user['id']?.toString();
+                    if (id == null) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('친구 정보를 찾을 수 없습니다.')),
+                      );
+                      return;
+                    }
+
+                    final success = await notifier.deleteFriend(id);
+                    if (success && mounted) {
+                      Navigator.pop(context); // Close profile screen
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('친구가 삭제되었습니다.')),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  '친구 삭제',
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 사용자 차단 버튼
+              TextButton(
+                onPressed: () async {
+                  final shouldBlock = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('사용자 차단'),
+                      content: Text('${widget.user['name']}님을 차단하시겠습니까?\n차단하면 친구 목록에서도 삭제됩니다.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('차단', style: TextStyle(color: AppTheme.errorColor)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (shouldBlock == true) {
+                    final notifier = ref.read(friendActionProvider.notifier);
+                    final id = widget.user['id']?.toString();
+                    if (id == null) return;
+                    
+                    final success = await notifier.blockUser(id);
+                    // blockUser가 성공하면 친구목록도 갱신됨 (Provider 내부 구현)
+                    
+                    if (success && mounted) {
+                       Navigator.pop(context); // Close profile
+                       ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('사용자가 차단되었습니다.')),
+                      );
+                    } else if (mounted) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('차단에 실패했습니다.')),
+                      );
+                    }
+                  }
                 },
                 child: const Text(
                   '사용자 차단',

@@ -1,14 +1,17 @@
 // 보안 설정 화면
 import 'package:flutter/material.dart';
 
-class SecuritySettingsScreen extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/settings_provider.dart';
+
+class SecuritySettingsScreen extends ConsumerStatefulWidget {
   const SecuritySettingsScreen({Key? key}) : super(key: key);
 
   @override
-  State<SecuritySettingsScreen> createState() => _SecuritySettingsScreenState();
+  ConsumerState<SecuritySettingsScreen> createState() => _SecuritySettingsScreenState();
 }
 
-class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
+class _SecuritySettingsScreenState extends ConsumerState<SecuritySettingsScreen> {
   bool _twoFactorAuth = false;
   bool _biometricAuth = false;
 
@@ -257,6 +260,10 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   }
 
   void _showChangePasswordDialog(BuildContext context) {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -265,6 +272,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              controller: currentPasswordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: '현재 비밀번호',
@@ -275,6 +283,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: newPasswordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: '새 비밀번호',
@@ -285,6 +294,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: confirmPasswordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: '비밀번호 확인',
@@ -301,11 +311,39 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('비밀번호가 변경되었습니다')),
+            onPressed: () async {
+               if (newPasswordController.text != confirmPasswordController.text) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('새 비밀번호가 일치하지 않습니다.')),
+                 );
+                 return;
+               }
+               if (currentPasswordController.text.isEmpty || newPasswordController.text.isEmpty) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('비밀번호를 입력해주세요.')),
+                 );
+                 return;
+               }
+
+              final notifier = ref.read(settingsActionProvider.notifier);
+              final success = await notifier.changePassword(
+                currentPasswordController.text,
+                newPasswordController.text,
+                confirmPasswordController.text,
               );
+
+              if (success && mounted) {
+                Navigator.pop(context);
+                final message = ref.read(settingsActionProvider).successMessage;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message ?? '비밀번호가 변경되었습니다')),
+                );
+              } else if (mounted) {
+                 final error = ref.read(settingsActionProvider).error;
+                 ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error ?? '비밀번호 변경에 실패했습니다')),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
